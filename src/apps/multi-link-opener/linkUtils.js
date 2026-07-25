@@ -50,8 +50,16 @@ export function parseLinks(value) {
   }
 }
 
-export function openLinks(urls, opener = window.open.bind(window)) {
-  let openedCount = 0
+export function openLinks(
+  urls,
+  {
+    opener = window.open.bind(window),
+    scheduler = window.setTimeout.bind(window),
+    delayMs = 0,
+  } = {},
+) {
+  const interval = Math.max(0, Number(delayMs) || 0)
+  const reservations = []
   let blockedCount = 0
 
   for (const url of urls) {
@@ -62,21 +70,35 @@ export function openLinks(urls, opener = window.open.bind(window)) {
       continue
     }
 
-    openedCount += 1
-
     try {
       openedWindow.opener = null
       const referrerPolicy = openedWindow.document.createElement('meta')
       referrerPolicy.name = 'referrer'
       referrerPolicy.content = 'no-referrer'
       openedWindow.document.head.append(referrerPolicy)
-      openedWindow.location.replace(url)
     } catch {
-      // The reserved about:blank tab should be same-origin. This fallback
-      // still navigates if a browser limits access to its initial document.
-      openedWindow.location.href = url
+      // Some browsers restrict access to the reserved tab's initial
+      // document. Navigation still proceeds through the fallback below.
+    }
+
+    reservations.push({ openedWindow, url })
+  }
+
+  for (const [index, reservation] of reservations.entries()) {
+    const navigate = () => {
+      try {
+        reservation.openedWindow.location.replace(reservation.url)
+      } catch {
+        reservation.openedWindow.location.href = reservation.url
+      }
+    }
+
+    if (index === 0 || interval === 0) {
+      navigate()
+    } else {
+      scheduler(navigate, index * interval)
     }
   }
 
-  return { openedCount, blockedCount }
+  return { openedCount: reservations.length, blockedCount }
 }

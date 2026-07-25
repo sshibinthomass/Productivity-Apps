@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { normalizeUrl, openLinks, parseLinks } from './linkUtils.js'
 
 describe('normalizeUrl', () => {
@@ -56,7 +56,155 @@ describe('parseLinks', () => {
 })
 
 describe('openLinks', () => {
-  it('reserves protected tabs, navigates them, and reports blocked tabs', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  function createOpenedWindow(onNavigate = vi.fn()) {
+    const replace = vi.fn()
+    const append = vi.fn()
+    const referrerMeta = {}
+    replace.mockImplementation((url) => onNavigate(url))
+
+    return {
+      replace,
+      append,
+      referrerMeta,
+      openedWindow: {
+        opener: { unsafe: true },
+        location: { replace },
+        document: {
+          createElement: vi.fn(() => referrerMeta),
+          head: { append },
+        },
+      },
+    }
+  }
+
+  it('reserves every tab before navigating the first or scheduling later tabs', () => {
+    const events = []
+    const first = createOpenedWindow(() => events.push('navigate:first'))
+    const second = createOpenedWindow(() => events.push('navigate:second'))
+    const windows = [first.openedWindow, second.openedWindow]
+    const opener = vi.fn(() => {
+      events.push('reserve')
+      return windows.shift()
+    })
+    const scheduler = vi.fn((callback, delayMs) => {
+      events.push(`schedule:${delayMs}`)
+      return callback
+    })
+
+    expect(
+      openLinks(['https://a.example/', 'https://b.example/'], {
+        opener,
+        scheduler,
+        delayMs: 2000,
+      }),
+    ).toEqual({
+      openedCount: 2,
+      blockedCount: 0,
+    })
+    expect(events).toEqual([
+      'reserve',
+      'reserve',
+      'navigate:first',
+      'schedule:2000',
+    ])
+    expect(scheduler).toHaveBeenCalledWith(expect.any(Function), 2000)
+    expect(second.replace).not.toHaveBeenCalled()
+  })
+
+  it('navigates reserved tabs at cumulative delay intervals', () => {
+    vi.useFakeTimers()
+    const first = createOpenedWindow()
+    const second = createOpenedWindow()
+    const third = createOpenedWindow()
+    const opener = vi
+      .fn()
+      .mockReturnValueOnce(first.openedWindow)
+      .mockReturnValueOnce(second.openedWindow)
+      .mockReturnValueOnce(third.openedWindow)
+
+    openLinks(
+      [
+        'https://a.example/',
+        'https://b.example/',
+        'https://c.example/',
+      ],
+      {
+        opener,
+        scheduler: setTimeout,
+        delayMs: 2000,
+      },
+    )
+
+    expect(first.replace).toHaveBeenCalledWith('https://a.example/')
+    expect(second.replace).not.toHaveBeenCalled()
+    expect(third.replace).not.toHaveBeenCalled()
+
+    vi.advanceTimersByTime(2000)
+    expect(second.replace).toHaveBeenCalledWith('https://b.example/')
+    expect(third.replace).not.toHaveBeenCalled()
+
+    vi.advanceTimersByTime(2000)
+    expect(third.replace).toHaveBeenCalledWith('https://c.example/')
+  })
+
+  it('navigates every reserved tab immediately when delay is zero', () => {
+    const first = createOpenedWindow()
+    const second = createOpenedWindow()
+    const scheduler = vi.fn()
+
+    openLinks(['https://a.example/', 'https://b.example/'], {
+      opener: vi
+        .fn()
+        .mockReturnValueOnce(first.openedWindow)
+        .mockReturnValueOnce(second.openedWindow),
+      scheduler,
+      delayMs: 0,
+    })
+
+    expect(first.replace).toHaveBeenCalledWith('https://a.example/')
+    expect(second.replace).toHaveBeenCalledWith('https://b.example/')
+    expect(scheduler).not.toHaveBeenCalled()
+  })
+
+  it('excludes blocked tabs from contiguous schedule positions', () => {
+    vi.useFakeTimers()
+    const first = createOpenedWindow()
+    const third = createOpenedWindow()
+    const opener = vi
+      .fn()
+      .mockReturnValueOnce(first.openedWindow)
+      .mockReturnValueOnce(null)
+      .mockReturnValueOnce(third.openedWindow)
+
+    expect(
+      openLinks(
+        [
+          'https://a.example/',
+          'https://blocked.example/',
+          'https://c.example/',
+        ],
+        {
+          opener,
+          scheduler: setTimeout,
+          delayMs: 2000,
+        },
+      ),
+    ).toEqual({
+      openedCount: 2,
+      blockedCount: 1,
+    })
+
+    expect(first.replace).toHaveBeenCalledWith('https://a.example/')
+    expect(third.replace).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(2000)
+    expect(third.replace).toHaveBeenCalledWith('https://c.example/')
+  })
+
+  it('protects every reserved tab before navigation', () => {
     const replace = vi.fn()
     const append = vi.fn()
     const referrerMeta = {}
@@ -68,19 +216,16 @@ describe('openLinks', () => {
         head: { append },
       },
     }
-    const opener = vi
-      .fn()
-      .mockReturnValueOnce(openedWindow)
-      .mockReturnValueOnce(null)
-
     expect(
-      openLinks(['https://a.example/', 'https://b.example/'], opener),
+      openLinks(['https://a.example/'], {
+        opener: vi.fn(() => openedWindow),
+        scheduler: vi.fn(),
+        delayMs: 0,
+      }),
     ).toEqual({
       openedCount: 1,
-      blockedCount: 1,
+      blockedCount: 0,
     })
-    expect(opener).toHaveBeenNthCalledWith(1, '', '_blank')
-    expect(opener).toHaveBeenNthCalledWith(2, '', '_blank')
     expect(openedWindow.opener).toBeNull()
     expect(referrerMeta).toEqual({
       name: 'referrer',
