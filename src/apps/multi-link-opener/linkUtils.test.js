@@ -56,8 +56,18 @@ describe('parseLinks', () => {
 })
 
 describe('openLinks', () => {
-  it('opens each URL in a protected new tab and reports blocked tabs', () => {
-    const openedWindow = { opener: { unsafe: true } }
+  it('reserves protected tabs, navigates them, and reports blocked tabs', () => {
+    const replace = vi.fn()
+    const append = vi.fn()
+    const referrerMeta = {}
+    const openedWindow = {
+      opener: { unsafe: true },
+      location: { replace },
+      document: {
+        createElement: vi.fn(() => referrerMeta),
+        head: { append },
+      },
+    }
     const opener = vi
       .fn()
       .mockReturnValueOnce(openedWindow)
@@ -69,18 +79,14 @@ describe('openLinks', () => {
       openedCount: 1,
       blockedCount: 1,
     })
-    expect(opener).toHaveBeenNthCalledWith(
-      1,
-      'https://a.example/',
-      '_blank',
-      'noopener,noreferrer',
-    )
-    expect(opener).toHaveBeenNthCalledWith(
-      2,
-      'https://b.example/',
-      '_blank',
-      'noopener,noreferrer',
-    )
+    expect(opener).toHaveBeenNthCalledWith(1, '', '_blank')
+    expect(opener).toHaveBeenNthCalledWith(2, '', '_blank')
     expect(openedWindow.opener).toBeNull()
+    expect(referrerMeta).toEqual({
+      name: 'referrer',
+      content: 'no-referrer',
+    })
+    expect(append).toHaveBeenCalledWith(referrerMeta)
+    expect(replace).toHaveBeenCalledWith('https://a.example/')
   })
 })

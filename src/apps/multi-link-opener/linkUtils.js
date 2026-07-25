@@ -55,7 +55,7 @@ export function openLinks(urls, opener = window.open.bind(window)) {
   let blockedCount = 0
 
   for (const url of urls) {
-    const openedWindow = opener(url, '_blank', 'noopener,noreferrer')
+    const openedWindow = opener('', '_blank')
 
     if (!openedWindow) {
       blockedCount += 1
@@ -66,9 +66,15 @@ export function openLinks(urls, opener = window.open.bind(window)) {
 
     try {
       openedWindow.opener = null
+      const referrerPolicy = openedWindow.document.createElement('meta')
+      referrerPolicy.name = 'referrer'
+      referrerPolicy.content = 'no-referrer'
+      openedWindow.document.head.append(referrerPolicy)
+      openedWindow.location.replace(url)
     } catch {
-      // Cross-origin protections can make opener read-only; window features
-      // already request noopener, so no recovery is needed.
+      // The reserved about:blank tab should be same-origin. This fallback
+      // still navigates if a browser limits access to its initial document.
+      openedWindow.location.href = url
     }
   }
 

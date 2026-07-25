@@ -1,4 +1,6 @@
 .worktrees/
 node_modules/
 dist/
+.playwright-cli/
+output/
 *.local
