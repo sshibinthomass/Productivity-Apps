@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Opening Productivity Apps…</title>
+  </head>
+  <body>
+    <p>Opening Productivity Apps…</p>
+    <script>
+      ;(() => {
+        const base = '/Productivity-Apps'
+        const { pathname, search, hash } = window.location
+
+        if (pathname !== base && !pathname.startsWith(`${base}/`)) {
+          window.location.replace(`${base}/`)
+          return
+        }
+
+        const requestedRoute = pathname.slice(base.length) || '/'
+        const route = `${requestedRoute}${search}${hash}`
+        window.location.replace(
+          `${base}/?route=${encodeURIComponent(route)}`,
+        )
+      })()
+    </script>
+  </body>
+</html>
