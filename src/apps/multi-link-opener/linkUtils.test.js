@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { normalizeUrl, openLinks, parseLinks } from './linkUtils.js'
+import {
+  MAX_URL_LENGTH,
+  normalizeUrl,
+  openLinks,
+  parseLinks,
+} from './linkUtils.js'
 
 describe('normalizeUrl', () => {
   it('adds https to a domain without a protocol', () => {
@@ -32,6 +37,56 @@ describe('parseLinks', () => {
 
     expect(result.validUrls).toEqual(['https://google.com/'])
     expect(result.duplicateCount).toBe(2)
+    expect(result.adjustedEntries).toEqual([
+      { original: 'google.com', normalized: 'https://google.com/' },
+      { original: 'https://google.com', normalized: 'https://google.com/' },
+      { original: 'GOOGLE.com', normalized: 'https://google.com/' },
+    ])
+  })
+
+  it.each([
+    ['\u200Bexample.com\u2060', 'https://example.com/'],
+    ['- example.com/docs', 'https://example.com/docs'],
+    ['* https://example.com', 'https://example.com/'],
+    ['\u2022 example.com', 'https://example.com/'],
+    ['"example.com"', 'https://example.com/'],
+    ["'example.com'", 'https://example.com/'],
+    ['<example.com>', 'https://example.com/'],
+    ['(example.com)', 'https://example.com/'],
+    ['[example.com]', 'https://example.com/'],
+    ['//example.com/path', 'https://example.com/path'],
+  ])('cleans %j and reports its normalized value', (input, normalized) => {
+    const result = parseLinks(input)
+
+    expect(result.validUrls).toEqual([normalized])
+    expect(result.adjustedEntries).toEqual([{ original: input, normalized }])
+  })
+
+  it('keeps multiple wrappers and trailing punctuation intact', () => {
+    expect(parseLinks('((example.com))').validUrls).toEqual([])
+    expect(parseLinks('example.com,').validUrls).toEqual(['https://example.com,/'])
+  })
+
+  it.each([
+    ['\u200B', 'empty-after-cleanup'],
+    ['person@example.com', 'email-address'],
+    ['example.com/a path', 'internal-whitespace'],
+    ['ftp://example.com', 'unsupported-protocol'],
+    ['https://user:secret@example.com', 'credentials'],
+    ['https://', 'invalid-url'],
+  ])('classifies %j as %s', (value, reason) => {
+    expect(parseLinks(value).invalidEntries).toEqual([{ value, reason }])
+  })
+
+  it('accepts a URL exactly at the maximum length and rejects one over it', () => {
+    const prefix = 'https://example.com/'
+    const atLimit = `${prefix}${'a'.repeat(MAX_URL_LENGTH - prefix.length)}`
+    const overLimit = `${atLimit}a`
+
+    expect(parseLinks(atLimit).validUrls).toEqual([atLimit])
+    expect(parseLinks(overLimit).invalidEntries).toEqual([
+      { value: overLimit, reason: 'too-long' },
+    ])
   })
 
   it('reports malformed values and unsupported protocols', () => {
@@ -39,18 +94,53 @@ describe('parseLinks', () => {
       parseLinks('javascript:alert(1)\nnot a url\ndata:text/plain,hello')
         .invalidEntries,
     ).toEqual([
-      'javascript:alert(1)',
-      'not a url',
-      'data:text/plain,hello',
+      { value: 'javascript:alert(1)', reason: 'unsupported-protocol' },
+      { value: 'not a url', reason: 'internal-whitespace' },
+      { value: 'data:text/plain,hello', reason: 'unsupported-protocol' },
     ])
+  })
+
+  it('allows up to one hundred entries and rejects more', () => {
+    const oneHundred = Array.from(
+      { length: 100 },
+      (_, index) => `https://example.com/${index}`,
+    ).join('\n')
+    const oneHundredAndOne = `${oneHundred}\nhttps://example.com/100`
+
+    expect(parseLinks(oneHundred)).toMatchObject({
+      entryCount: 100,
+      limitError: null,
+    })
+    expect(parseLinks(oneHundred).validUrls).toHaveLength(100)
+    expect(parseLinks(oneHundredAndOne)).toEqual({
+      validUrls: [],
+      invalidEntries: [],
+      adjustedEntries: [],
+      duplicateCount: 0,
+      entryCount: 101,
+      limitError: 'You can open up to 100 links at a time.',
+    })
+  })
+
+  it.each([
+    ['localhost:3000/path', 'https://localhost:3000/path'],
+    ['127.0.0.1:8080', 'https://127.0.0.1:8080/'],
+    ['example.com:8443/docs', 'https://example.com:8443/docs'],
+    ['http://[::1]:3000', 'http://[::1]:3000/'],
+    ['example.com/search?q=one#result', 'https://example.com/search?q=one#result'],
+    ['https://münich.example', 'https://xn--mnich-kva.example/'],
+  ])('preserves supported address forms', (input, expected) => {
+    expect(parseLinks(input).validUrls).toEqual([expected])
   })
 
   it('returns an empty result for whitespace-only input', () => {
     expect(parseLinks(' \n\t\n')).toEqual({
       validUrls: [],
       invalidEntries: [],
+      adjustedEntries: [],
       duplicateCount: 0,
       entryCount: 0,
+      limitError: null,
     })
   })
 })
