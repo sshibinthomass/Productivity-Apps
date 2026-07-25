@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { openLinks, parseLinks } from './linkUtils.js'
+import { INVALID_REASON_MESSAGES, openLinks, parseLinks } from './linkUtils.js'
 import './MultiLinkOpenerPage.css'
 
 const EXAMPLE_LINKS = `github.com
@@ -23,9 +23,11 @@ export default function MultiLinkOpenerPage() {
       60,
       Math.max(0, Math.floor(Number(delaySeconds) || 0)),
     )
-    const opened = openLinks(parsed.validUrls, {
-      delayMs: normalizedDelay * 1000,
-    })
+    const opened = parsed.limitError
+      ? { openedCount: 0, blockedCount: 0 }
+      : openLinks(parsed.validUrls, {
+          delayMs: normalizedDelay * 1000,
+        })
     setDelaySeconds(String(normalizedDelay))
     setResult({ ...parsed, ...opened, delaySeconds: normalizedDelay })
   }
@@ -157,7 +159,7 @@ export default function MultiLinkOpenerPage() {
   )
 }
 
-function ResultPanel({ result }) {
+export function ResultPanel({ result }) {
   if (!result) {
     return (
       <div className="result-panel result-panel--idle" aria-live="polite">
@@ -168,6 +170,7 @@ function ResultPanel({ result }) {
   }
 
   const hasIssues =
+    result.limitError ||
     result.invalidEntries.length > 0 ||
     result.duplicateCount > 0 ||
     result.blockedCount > 0
@@ -188,6 +191,7 @@ function ResultPanel({ result }) {
               ? `${result.openedCount} tabs scheduled`
               : `${result.openedCount} ${result.openedCount === 1 ? 'link' : 'links'} opened`}
         </strong>
+        {result.limitError && <p className="limit-error">{result.limitError}</p>}
         {isScheduled && (
           <p>
             First link is loading now. The rest will load every{' '}
@@ -218,10 +222,33 @@ function ResultPanel({ result }) {
             </p>
             <ul>
               {result.invalidEntries.map((entry, index) => (
-                <li key={`${entry}-${index}`}>{entry}</li>
+                <li key={`${entry.value}-${entry.reason}-${index}`}>
+                  <code>{entry.value}</code>
+                  <span>
+                    {INVALID_REASON_MESSAGES[entry.reason] ??
+                      INVALID_REASON_MESSAGES['invalid-url']}
+                  </span>
+                </li>
               ))}
             </ul>
           </div>
+        )}
+        {result.adjustedEntries.length > 0 && (
+          <details className="adjusted-links">
+            <summary>
+              Adjusted {result.adjustedEntries.length}{' '}
+              {result.adjustedEntries.length === 1 ? 'link' : 'links'}
+            </summary>
+            <ul>
+              {result.adjustedEntries.map((entry, index) => (
+                <li key={`${entry.original}-${entry.normalized}-${index}`}>
+                  <code>{entry.original}</code>
+                  <span aria-hidden="true">-&gt;</span>
+                  <code>{entry.normalized}</code>
+                </li>
+              ))}
+            </ul>
+          </details>
         )}
       </div>
     </div>

@@ -333,6 +333,36 @@
 }
 
 .invalid-links li {
+  display: grid;
+  gap: 0.2rem;
+  overflow-wrap: anywhere;
+}
+
+.invalid-links code,
+.adjusted-links code {
+  font-family: var(--font-utility);
+  overflow-wrap: anywhere;
+}
+
+.adjusted-links {
+  margin-top: 0.55rem;
+}
+
+.adjusted-links summary {
+  color: var(--violet-deep);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.adjusted-links ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.adjusted-links li {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   overflow-wrap: anywhere;
 }
 
@@ -406,5 +436,9 @@
 
   .link-form__actions .button--primary {
     flex-basis: 100%;
+  }
+
+  .adjusted-links li {
+    grid-template-columns: 1fr;
   }
 }

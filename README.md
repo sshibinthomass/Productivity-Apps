@@ -8,6 +8,10 @@ A growing collection of focused React tools in one Vite application.
   destination in a separate tab, either immediately or at a selected
   whole-second interval. The first link always loads immediately.
 
+The opener removes common list markers, wrappers, and invisible copy-paste
+characters, reports every adjusted or invalid entry, and accepts up to 100
+HTTP/HTTPS links per submission. It never guesses a misspelled domain.
+
 ## Local development
 
 Node.js 22.12 or newer is required.
