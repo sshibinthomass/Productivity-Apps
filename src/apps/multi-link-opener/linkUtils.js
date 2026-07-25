@@ -40,6 +40,10 @@ function cleanEntry(value) {
   return unwrapped.trim()
 }
 
+function hasMatchingWrapperPair(value) {
+  return WRAPPERS.get(value[0]) === value.at(-1)
+}
+
 export function normalizeUrl(value) {
   const trimmed = value.trim()
 
@@ -104,12 +108,7 @@ export function parseLinks(value) {
         continue
       }
 
-      if (
-        !url.hostname.trim() ||
-        entry.startsWith('(') ||
-        entry.endsWith(')') ||
-        entry.startsWith('[')
-      ) {
+      if (!url.hostname.trim() || hasMatchingWrapperPair(entry)) {
         reject(original, 'invalid-url')
         continue
       }

@@ -67,6 +67,12 @@ describe('parseLinks', () => {
     expect(parseLinks('example.com,').validUrls).toEqual(['https://example.com,/'])
   })
 
+  it('preserves trailing parentheses accepted by the URL parser', () => {
+    expect(parseLinks('example.com/docs)').validUrls).toEqual([
+      'https://example.com/docs)',
+    ])
+  })
+
   it.each([
     ['\u200B', 'empty-after-cleanup'],
     ['person@example.com', 'email-address'],
