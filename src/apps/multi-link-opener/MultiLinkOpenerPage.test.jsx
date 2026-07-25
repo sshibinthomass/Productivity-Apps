@@ -21,6 +21,7 @@ describe('MultiLinkOpenerPage', () => {
     expect(markup).toContain('Open links')
     expect(markup).toContain('disabled=""')
   })
+
 })
 
 describe('ResultPanel', () => {
@@ -49,6 +50,7 @@ describe('ResultPanel', () => {
     )
     expect(markup).toContain('Adjusted 1 link')
     expect(markup).toContain('example.com')
+    expect(markup).toContain('changed to')
     expect(markup).toContain('https://example.com/')
     expect(markup).toContain('<details')
   })

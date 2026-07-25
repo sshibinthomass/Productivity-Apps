@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { INVALID_REASON_MESSAGES, openLinks, parseLinks } from './linkUtils.js'
+import { INVALID_REASON_MESSAGES, submitLinks } from './linkUtils.js'
 import './MultiLinkOpenerPage.css'
 
 const EXAMPLE_LINKS = `github.com
@@ -18,18 +18,10 @@ export default function MultiLinkOpenerPage() {
 
   function handleSubmit(event) {
     event.preventDefault()
-    const parsed = parseLinks(text)
-    const normalizedDelay = Math.min(
-      60,
-      Math.max(0, Math.floor(Number(delaySeconds) || 0)),
-    )
-    const opened = parsed.limitError
-      ? { openedCount: 0, blockedCount: 0 }
-      : openLinks(parsed.validUrls, {
-          delayMs: normalizedDelay * 1000,
-        })
-    setDelaySeconds(String(normalizedDelay))
-    setResult({ ...parsed, ...opened, delaySeconds: normalizedDelay })
+    const submission = submitLinks(text, delaySeconds)
+
+    setDelaySeconds(String(submission.delaySeconds))
+    setResult(submission)
   }
 
   function handleClear() {
@@ -243,6 +235,9 @@ export function ResultPanel({ result }) {
               {result.adjustedEntries.map((entry, index) => (
                 <li key={`${entry.original}-${entry.normalized}-${index}`}>
                   <code>{entry.original}</code>
+                  <span className="adjusted-links__relationship">
+                    changed to
+                  </span>
                   <span aria-hidden="true">-&gt;</span>
                   <code>{entry.normalized}</code>
                 </li>

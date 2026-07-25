@@ -4,6 +4,7 @@ import {
   normalizeUrl,
   openLinks,
   parseLinks,
+  submitLinks,
 } from './linkUtils.js'
 
 describe('normalizeUrl', () => {
@@ -62,6 +63,15 @@ describe('parseLinks', () => {
     expect(result.adjustedEntries).toEqual([{ original: input, normalized }])
   })
 
+  it.each([
+    ['[::1]', 'https://[::1]/'],
+    ['[2001:db8::1]', 'https://[2001:db8::1]/'],
+    ['[::ffff:192.0.2.1]', 'https://[::ffff:c000:201]/'],
+    ['- [::1]', 'https://[::1]/'],
+  ])('preserves the bare IPv6 literal in %j', (input, normalized) => {
+    expect(parseLinks(input).validUrls).toEqual([normalized])
+  })
+
   it('keeps multiple wrappers and trailing punctuation intact', () => {
     expect(parseLinks('((example.com))').validUrls).toEqual([])
     expect(parseLinks('example.com,').validUrls).toEqual(['https://example.com,/'])
@@ -82,6 +92,16 @@ describe('parseLinks', () => {
     ['https://', 'invalid-url'],
   ])('classifies %j as %s', (value, reason) => {
     expect(parseLinks(value).invalidEntries).toEqual([{ value, reason }])
+  })
+
+  it.each([
+    ['- ', '-'],
+    ['* ', '*'],
+    ['\u2022 ', '\u2022'],
+  ])('rejects the marker-only line %j after cleanup', (input, value) => {
+    expect(parseLinks(input).invalidEntries).toEqual([
+      { value, reason: 'empty-after-cleanup' },
+    ])
   })
 
   it('accepts a URL exactly at the maximum length and rejects one over it', () => {
@@ -329,5 +349,26 @@ describe('openLinks', () => {
     })
     expect(append).toHaveBeenCalledWith(referrerMeta)
     expect(replace).toHaveBeenCalledWith('https://a.example/')
+  })
+})
+
+describe('submitLinks', () => {
+  it('does not open links when the parsed submission exceeds the limit', () => {
+    const overLimit = Array.from(
+      { length: 101 },
+      (_, index) => `https://example.com/${index}`,
+    ).join('\n')
+    const failIfOpened = () => {
+      throw new Error('The link-opening function was called')
+    }
+
+    const result = submitLinks(overLimit, '7', failIfOpened)
+
+    expect(result).toMatchObject({
+      limitError: 'You can open up to 100 links at a time.',
+      openedCount: 0,
+      blockedCount: 0,
+      delaySeconds: 7,
+    })
   })
 })

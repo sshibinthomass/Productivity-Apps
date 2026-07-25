@@ -27,13 +27,29 @@ const WRAPPERS = new Map([
   ['[', ']'],
 ])
 
+function isBareIpv6Literal(value) {
+  if (!value.startsWith('[') || !value.endsWith(']')) {
+    return false
+  }
+
+  try {
+    const url = new URL(`https://${value}`)
+
+    return url.hostname.startsWith('[') && url.hostname.endsWith(']')
+  } catch {
+    return false
+  }
+}
+
 function cleanEntry(value) {
   const withoutInvisibleCharacters = value.replace(INVISIBLE_CHARACTERS, '')
   const withoutListMarker = withoutInvisibleCharacters.replace(LIST_MARKER, '')
   const trimmed = withoutListMarker.trim()
   const closingWrapper = WRAPPERS.get(trimmed[0])
   const unwrapped =
-    closingWrapper && trimmed.endsWith(closingWrapper)
+    closingWrapper &&
+    trimmed.endsWith(closingWrapper) &&
+    !isBareIpv6Literal(trimmed)
       ? trimmed.slice(1, -1)
       : trimmed
 
@@ -41,7 +57,9 @@ function cleanEntry(value) {
 }
 
 function hasMatchingWrapperPair(value) {
-  return WRAPPERS.get(value[0]) === value.at(-1)
+  return (
+    WRAPPERS.get(value[0]) === value.at(-1) && !isBareIpv6Literal(value)
+  )
 }
 
 export function normalizeUrl(value) {
@@ -59,8 +77,8 @@ export function normalizeUrl(value) {
 export function parseLinks(value) {
   const entries = value
     .split(/\r?\n/)
-    .map((entry) => entry.trim())
-    .filter(Boolean)
+    .map((source) => ({ source, original: source.trim() }))
+    .filter(({ original }) => original)
 
   if (entries.length > MAX_ENTRIES) {
     return {
@@ -82,8 +100,8 @@ export function parseLinks(value) {
     invalidEntries.push({ value, reason })
   }
 
-  for (const original of entries) {
-    const entry = cleanEntry(original)
+  for (const { source, original } of entries) {
+    const entry = cleanEntry(source)
 
     if (!entry) {
       reject(original, 'empty-after-cleanup')
@@ -149,6 +167,21 @@ export function parseLinks(value) {
     entryCount: entries.length,
     limitError: null,
   }
+}
+
+export function submitLinks(text, delaySeconds, open = openLinks) {
+  const parsed = parseLinks(text)
+  const normalizedDelay = Math.min(
+    60,
+    Math.max(0, Math.floor(Number(delaySeconds) || 0)),
+  )
+  const opened = parsed.limitError
+    ? { openedCount: 0, blockedCount: 0 }
+    : open(parsed.validUrls, {
+        delayMs: normalizedDelay * 1000,
+      })
+
+  return { ...parsed, ...opened, delaySeconds: normalizedDelay }
 }
 
 export function openLinks(
