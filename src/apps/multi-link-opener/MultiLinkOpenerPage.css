@@ -197,6 +197,74 @@
   outline: none;
 }
 
+.delay-control {
+  align-items: center;
+  background: var(--paper-deep);
+  border: 1px solid var(--paper-line);
+  border-radius: 0.7rem;
+  display: flex;
+  gap: 1.5rem;
+  justify-content: space-between;
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+}
+
+.delay-control__copy label {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  letter-spacing: 0;
+}
+
+.delay-control__copy p {
+  color: var(--navy-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  margin: 0.2rem 0 0;
+}
+
+.delay-control__input {
+  align-items: center;
+  background: #fffefa;
+  border: 1px solid var(--paper-line);
+  border-radius: 0.55rem;
+  display: flex;
+  flex: 0 0 auto;
+  min-height: 2.75rem;
+  overflow: hidden;
+}
+
+.delay-control__input input {
+  appearance: textfield;
+  background: transparent;
+  border: 0;
+  color: var(--violet-deep);
+  font-family: var(--font-utility);
+  font-size: 1rem;
+  font-weight: 700;
+  height: 2.75rem;
+  outline: none;
+  padding: 0.55rem 0.2rem 0.55rem 0.8rem;
+  text-align: right;
+  width: 4.2rem;
+}
+
+.delay-control__input input::-webkit-inner-spin-button {
+  opacity: 1;
+}
+
+.delay-control__input:focus-within {
+  border-color: var(--violet);
+  box-shadow: 0 0 0 4px rgb(110 86 218 / 13%);
+}
+
+.delay-control__input span {
+  color: var(--navy-muted);
+  font-family: var(--font-utility);
+  font-size: 0.68rem;
+  padding: 0.2rem 0.8rem 0.2rem 0.45rem;
+  text-transform: uppercase;
+}
+
 .link-form__actions {
   display: flex;
   gap: 0.75rem;
@@ -323,6 +391,17 @@
 
   .link-form__actions {
     flex-wrap: wrap;
+  }
+
+  .delay-control {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+
+  .delay-control__input {
+    align-self: stretch;
+    justify-content: flex-end;
   }
 
   .link-form__actions .button--primary {

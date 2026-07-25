@@ -5,7 +5,8 @@ A growing collection of focused React tools in one Vite application.
 ## Included apps
 
 - **Multi Link Opener** — paste one link per line and open every valid
-  destination in a separate tab.
+  destination in a separate tab, either immediately or at a selected
+  whole-second interval. The first link always loads immediately.
 
 ## Local development
 

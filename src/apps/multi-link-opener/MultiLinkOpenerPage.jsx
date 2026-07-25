@@ -8,6 +8,7 @@ notion.so`
 
 export default function MultiLinkOpenerPage() {
   const [text, setText] = useState('')
+  const [delaySeconds, setDelaySeconds] = useState('0')
   const [result, setResult] = useState(null)
 
   const entryCount = useMemo(
@@ -18,8 +19,15 @@ export default function MultiLinkOpenerPage() {
   function handleSubmit(event) {
     event.preventDefault()
     const parsed = parseLinks(text)
-    const opened = openLinks(parsed.validUrls)
-    setResult({ ...parsed, ...opened })
+    const normalizedDelay = Math.min(
+      60,
+      Math.max(0, Math.floor(Number(delaySeconds) || 0)),
+    )
+    const opened = openLinks(parsed.validUrls, {
+      delayMs: normalizedDelay * 1000,
+    })
+    setDelaySeconds(String(normalizedDelay))
+    setResult({ ...parsed, ...opened, delaySeconds: normalizedDelay })
   }
 
   function handleClear() {
@@ -96,6 +104,33 @@ export default function MultiLinkOpenerPage() {
             autoCorrect="off"
           />
 
+          <div className="delay-control">
+            <div className="delay-control__copy">
+              <label htmlFor="link-delay">Delay between links</label>
+              <p id="link-delay-help">
+                First link opens immediately. Waiting tabs stay blank until
+                their turn.
+              </p>
+            </div>
+            <div className="delay-control__input">
+              <input
+                id="link-delay"
+                name="delay"
+                type="number"
+                min="0"
+                max="60"
+                step="1"
+                value={delaySeconds}
+                aria-describedby="link-delay-help"
+                onChange={(event) => {
+                  setDelaySeconds(event.target.value)
+                  setResult(null)
+                }}
+              />
+              <span>seconds</span>
+            </div>
+          </div>
+
           <div className="link-form__actions">
             <button
               className="button button--primary"
@@ -136,6 +171,7 @@ function ResultPanel({ result }) {
     result.invalidEntries.length > 0 ||
     result.duplicateCount > 0 ||
     result.blockedCount > 0
+  const isScheduled = result.delaySeconds > 0 && result.openedCount > 1
 
   return (
     <div
@@ -148,8 +184,16 @@ function ResultPanel({ result }) {
         <strong>
           {result.openedCount === 0
             ? 'No links opened'
-            : `${result.openedCount} ${result.openedCount === 1 ? 'link' : 'links'} opened`}
+            : isScheduled
+              ? `${result.openedCount} tabs scheduled`
+              : `${result.openedCount} ${result.openedCount === 1 ? 'link' : 'links'} opened`}
         </strong>
+        {isScheduled && (
+          <p>
+            First link is loading now. The rest will load every{' '}
+            {result.delaySeconds} seconds.
+          </p>
+        )}
         {result.blockedCount > 0 && (
           <p>
             Your browser blocked {result.blockedCount}{' '}
