@@ -32,48 +32,28 @@ export default function MultiLinkOpenerPage() {
   return (
     <div className="link-opener-page">
       <header className="tool-intro">
-        <div>
-          <p className="eyebrow">Utility 01 / Browser workflow</p>
-          <h1>Open the whole stack.</h1>
-        </div>
-        <p>
-          Paste every destination you need. One click turns the list into a
-          ready-to-use set of tabs.
+        <p className="tool-breadcrumb">
+          <span>Arvenilo Network</span>
+          <span aria-hidden="true">/</span>
+          <span>Multi Link Opener</span>
         </p>
+        <div className="tool-intro__layout">
+          <div>
+            <p className="eyebrow">AVAILABLE NOW / BROWSER WORKFLOW</p>
+            <h1>Open every link in one controlled pass.</h1>
+          </div>
+          <p>
+            Paste every destination you need. Review the stack, choose the
+            pacing, and open each valid link in its own tab.
+          </p>
+        </div>
       </header>
 
-      <section className="link-workbench">
-        <aside className="link-guide">
-          <div className="link-guide__icon" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </div>
-          <div>
-            <p className="eyebrow">How it works</p>
-            <ol className="link-guide__steps">
-              <li>
-                <span>01</span>
-                Add one address per line.
-              </li>
-              <li>
-                <span>02</span>
-                Review the detected count.
-              </li>
-              <li>
-                <span>03</span>
-                Open every valid link.
-              </li>
-            </ol>
-          </div>
-          <p className="link-guide__note">
-            Missing <code>https://</code>? We add it for you.
-          </p>
-        </aside>
-
+      <section className="link-workbench" aria-label="Link opening workspace">
         <form className="link-form" onSubmit={handleSubmit}>
           <div className="link-form__heading">
             <div>
+              <p className="eyebrow">Link stack</p>
               <label htmlFor="link-list">Your links</label>
               <p>One link per line</p>
             </div>
@@ -146,6 +126,34 @@ export default function MultiLinkOpenerPage() {
 
           <ResultPanel result={result} />
         </form>
+
+        <aside className="link-guide">
+          <div className="link-guide__icon" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+          <div>
+            <p className="eyebrow">How it works</p>
+            <ol className="link-guide__steps">
+              <li>
+                <span>01</span>
+                Add one address per line.
+              </li>
+              <li>
+                <span>02</span>
+                Review the detected count.
+              </li>
+              <li>
+                <span>03</span>
+                Open every valid link.
+              </li>
+            </ol>
+          </div>
+          <p className="link-guide__note">
+            Missing <code>https://</code>? We add it for you.
+          </p>
+        </aside>
       </section>
     </div>
   )

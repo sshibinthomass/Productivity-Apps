@@ -6,6 +6,12 @@ describe('MultiLinkOpenerPage', () => {
   it('renders an accessible multiline link form in its empty state', () => {
     const markup = renderToStaticMarkup(<MultiLinkOpenerPage />)
 
+    expect(markup).toContain('Arvenilo Network')
+    expect(markup).toContain('Multi Link Opener')
+    expect(markup).toContain('Open every link in one controlled pass.')
+    expect(markup.indexOf('class="link-form"')).toBeLessThan(
+      markup.indexOf('class="link-guide"'),
+    )
     expect(markup).toContain('for="link-list"')
     expect(markup).toContain('id="link-list"')
     expect(markup).toContain('<textarea')
