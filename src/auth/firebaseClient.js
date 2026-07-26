@@ -1,11 +1,18 @@
 import { getApp, getApps, initializeApp } from 'firebase/app'
 import {
+  initializeAppCheck,
+  ReCaptchaEnterpriseProvider,
+} from 'firebase/app-check'
+import {
   getAuth,
   GoogleAuthProvider,
   onAuthStateChanged,
   signInWithPopup,
   signOut,
 } from 'firebase/auth'
+import { getFirestore } from 'firebase/firestore'
+import { getFunctions } from 'firebase/functions'
+import { getStorage } from 'firebase/storage'
 
 const REQUIRED_CONFIG = [
   ['VITE_FIREBASE_API_KEY', 'apiKey'],
@@ -35,6 +42,11 @@ const firebaseSdk = {
   onAuthStateChanged,
   signInWithPopup,
   signOut,
+  getFirestore,
+  getStorage,
+  getFunctions,
+  initializeAppCheck,
+  ReCaptchaEnterpriseProvider,
 }
 
 export function readFirebaseConfig(env) {
@@ -107,6 +119,10 @@ export function createFirebaseClient(env, sdk = firebaseSdk) {
   if (configurationError) {
     return {
       configurationError,
+      db: null,
+      storage: null,
+      functions: null,
+      appCheck: null,
       observeAuthState() {
         return () => {}
       },
@@ -122,9 +138,31 @@ export function createFirebaseClient(env, sdk = firebaseSdk) {
   const app =
     sdk.getApps().length > 0 ? sdk.getApp() : sdk.initializeApp(config)
   const auth = sdk.getAuth(app)
+  const db = sdk.getFirestore(app)
+  const storage = sdk.getStorage(app)
+  const region =
+    typeof env.VITE_FIREBASE_FUNCTIONS_REGION === 'string' &&
+    env.VITE_FIREBASE_FUNCTIONS_REGION.trim()
+      ? env.VITE_FIREBASE_FUNCTIONS_REGION.trim()
+      : 'europe-west1'
+  const functions = sdk.getFunctions(app, region)
+  const siteKey =
+    typeof env.VITE_FIREBASE_APP_CHECK_SITE_KEY === 'string'
+      ? env.VITE_FIREBASE_APP_CHECK_SITE_KEY.trim()
+      : ''
+  const appCheck = siteKey
+    ? sdk.initializeAppCheck(app, {
+        provider: new sdk.ReCaptchaEnterpriseProvider(siteKey),
+        isTokenAutoRefreshEnabled: true,
+      })
+    : null
 
   return {
     configurationError: null,
+    db,
+    storage,
+    functions,
+    appCheck,
     observeAuthState(onUser, onError) {
       return sdk.onAuthStateChanged(auth, onUser, onError)
     },

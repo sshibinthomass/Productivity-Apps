@@ -88,6 +88,7 @@ describe('createFirebaseClient', () => {
     let receivedUser = null
     let signedOut = false
     let providerId = null
+    let appCheckOptions = null
     const unsubscribe = () => {}
     class FakeGoogleAuthProvider {
       constructor() {
@@ -101,6 +102,18 @@ describe('createFirebaseClient', () => {
       },
       initializeApp: (config) => ({ config }),
       getAuth: (app) => ({ app }),
+      getFirestore: (app) => ({ type: 'firestore', app }),
+      getStorage: (app) => ({ type: 'storage', app }),
+      getFunctions: (app, region) => ({ type: 'functions', app, region }),
+      initializeAppCheck: (app, options) => {
+        appCheckOptions = { app, options }
+        return { type: 'app-check', app }
+      },
+      ReCaptchaEnterpriseProvider: class {
+        constructor(siteKey) {
+          this.siteKey = siteKey
+        }
+      },
       GoogleAuthProvider: FakeGoogleAuthProvider,
       onAuthStateChanged: (_auth, onUser) => {
         onUser(observedUser)
@@ -121,6 +134,8 @@ describe('createFirebaseClient', () => {
         VITE_FIREBASE_AUTH_DOMAIN: 'example.firebaseapp.com',
         VITE_FIREBASE_PROJECT_ID: 'example',
         VITE_FIREBASE_APP_ID: 'app-id',
+        VITE_FIREBASE_APP_CHECK_SITE_KEY: 'enterprise-key',
+        VITE_FIREBASE_FUNCTIONS_REGION: 'europe-west1',
       },
       sdk,
     )
@@ -137,5 +152,39 @@ describe('createFirebaseClient', () => {
     expect(credential.user).toEqual(observedUser)
     expect(providerId).toBe('google.com')
     expect(signedOut).toBe(true)
+    expect(client.db.type).toBe('firestore')
+    expect(client.storage.type).toBe('storage')
+    expect(client.functions.region).toBe('europe-west1')
+    expect(client.appCheck.type).toBe('app-check')
+    expect(appCheckOptions.options.provider.siteKey).toBe('enterprise-key')
+    expect(appCheckOptions.options.isTokenAutoRefreshEnabled).toBe(true)
+  })
+
+  it('keeps optional App Check disabled when no site key is configured', () => {
+    const sdk = {
+      getApps: () => [],
+      initializeApp: (config) => ({ config }),
+      getAuth: () => ({}),
+      getFirestore: () => ({}),
+      getStorage: () => ({}),
+      getFunctions: (_app, region) => ({ region }),
+      initializeAppCheck: () => {
+        throw new Error('App Check should not initialize')
+      },
+      GoogleAuthProvider: class {},
+    }
+
+    const client = createFirebaseClient(
+      {
+        VITE_FIREBASE_API_KEY: 'key',
+        VITE_FIREBASE_AUTH_DOMAIN: 'example.firebaseapp.com',
+        VITE_FIREBASE_PROJECT_ID: 'example',
+        VITE_FIREBASE_APP_ID: 'app-id',
+      },
+      sdk,
+    )
+
+    expect(client.appCheck).toBeNull()
+    expect(client.functions.region).toBe('europe-west1')
   })
 })
