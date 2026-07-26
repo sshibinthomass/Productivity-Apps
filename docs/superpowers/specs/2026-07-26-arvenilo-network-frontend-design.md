@@ -96,13 +96,16 @@ single selected signal point in the home hero. Red remains reserved for errors.
 The application keeps the existing router and registry-driven composition:
 
 - `/` — Arvenilo Network application directory
+- `/login` — existing Firebase Google sign-in surface
 - `/multi-link-opener` — working Multi Link Opener sub-application
 - `*` — Arvenilo-branded not-found state
 
 The global header contains the approved Arvenilo Network identity and, on
 sub-application routes, a clear `Network index` link back to `/`. The footer
 uses the brand promise `Where Intelligence Meets Reality.` and identifies the
-surface as `Arvenilo Network`.
+surface as `Arvenilo Network`. Existing signed-out, loading, signed-in, sign-out,
+and authentication-error controls remain functional and adopt the same brand
+tokens and responsive shell.
 
 ### Home page
 
@@ -181,6 +184,13 @@ and accent.
 
 Keeps its existing state and submission behavior. The change is limited to
 markup organization, brand copy, and responsive presentation.
+
+### Authentication surfaces
+
+`AuthControls`, `ProtectedRoute`, and `LoginPage` retain their existing Firebase
+Google authentication behavior. The login page and account controls use the
+Arvenilo Network shell, typography, focus, surface, and feedback treatments.
+Authentication remains optional for Multi Link Opener.
 
 ## Registry model
 
@@ -266,6 +276,8 @@ The layout must be visually checked at widths `320`, `390`, `768`, `1024`,
 Automated tests will verify:
 
 - Arvenilo Network identity and copy render in the global shell.
+- Existing authentication loading, sign-in, sign-out, protected-route, and
+  error-recovery behaviors remain green.
 - The home page renders one available application and three coming-soon
   applications; the available entry is a link and coming-soon entries are
   non-interactive articles.

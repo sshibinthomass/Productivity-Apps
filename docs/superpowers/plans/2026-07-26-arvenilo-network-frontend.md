@@ -37,11 +37,14 @@
 - `src/components/icons/AppIcons.jsx` — outline icons for announced application categories.
 - `src/config/appRegistry.jsx` — complete available and coming-soon application metadata.
 - `src/config/appRegistry.test.jsx` — verifies registry statuses, uniqueness, and route eligibility.
-- `src/App.jsx` — creates routes only from eligible applications.
+- `src/App.jsx` — creates routes only from eligible applications while preserving protected-route composition.
+- `src/App.test.jsx` — preserves public and protected authentication behavior with the availability model.
 - `src/pages/HomePage.jsx` — outcome hero, status summary, network signal, and complete directory.
 - `src/pages/HomePage.test.jsx` — verifies brand copy and availability content.
 - `src/pages/NotFoundPage.jsx` — Arvenilo Network recovery language.
 - `src/pages/NotFoundPage.test.jsx` — verifies recovery action and copy.
+- `src/pages/LoginPage.jsx` — existing Google sign-in surface retained inside the rebranded shell.
+- `src/components/AuthControls.jsx` — existing account states retained inside the rebranded header.
 - `src/apps/multi-link-opener/MultiLinkOpenerPage.jsx` — task-first branded workspace markup.
 - `src/apps/multi-link-opener/MultiLinkOpenerPage.test.jsx` — preserves behavior-facing contracts and checks new structure.
 - `src/styles/global.css` — handoff tokens, fonts, shell, home, cards, shared controls, and responsive rules.
@@ -56,10 +59,12 @@
 - Modify: `src/config/appRegistry.jsx`
 - Create: `src/components/icons/AppIcons.jsx`
 - Modify: `src/App.jsx`
+- Modify: `src/App.test.jsx`
 
 **Interfaces:**
 - Produces: `appRegistry: AppEntry[]`
 - Produces: `availableApps: AppEntry[]`
+- Produces: `isRoutableApp(app: AppEntry): boolean`
 - Produces: `TextIcon`, `TimerIcon`, and `NotesIcon` React components
 - `AppEntry.status` is `'available' | 'coming-soon'`
 
@@ -108,15 +113,20 @@ registry entry with `category` and `status`; use `null` path/component values fo
 future entries. Export:
 
 ```jsx
-export const availableApps = appRegistry.filter(
-  (app) =>
+export function isRoutableApp(app) {
+  return (
     app.status === 'available' &&
     typeof app.path === 'string' &&
-    typeof app.component === 'function',
-)
+    typeof app.component === 'function'
+  )
+}
+
+export const availableApps = appRegistry.filter(isRoutableApp)
 ```
 
-Update `App.jsx` to map `availableApps` instead of `appRegistry`.
+Update `App.jsx` to map `registry.filter(isRoutableApp)`, preserving its
+injectable registry prop and `ProtectedRoute` boundary. Add
+`status: 'available'` to the protected fixture in `src/App.test.jsx`.
 
 - [ ] **Step 4: Run the registry test and verify GREEN**
 
@@ -127,7 +137,7 @@ Expected: all registry tests PASS.
 - [ ] **Step 5: Commit the registry model**
 
 ```bash
-git add src/config/appRegistry.jsx src/config/appRegistry.test.jsx src/components/icons/AppIcons.jsx src/App.jsx
+git add src/config/appRegistry.jsx src/config/appRegistry.test.jsx src/components/icons/AppIcons.jsx src/App.jsx src/App.test.jsx
 git commit -m "feat: model Arvenilo Network applications"
 ```
 
@@ -175,7 +185,9 @@ describe('BrandLogo', () => {
 ```
 
 Create `Layout.test.jsx` using `MemoryRouter` and require the parent identity,
-promise, and route-aware `Network index` link.
+promise, and route-aware `Network index` link. Wrap `Layout` in
+`AuthContext.Provider` with a signed-out, non-loading value so the real
+`AuthControls` component renders.
 
 - [ ] **Step 2: Run the new tests and verify RED**
 
@@ -425,7 +437,9 @@ Reference fonts through `--font-display`, `--font-text`, and `--font-utility`.
 
 Use Spatial Ink/Void fields, Dark Border structure, the approved lockup at
 desktop, compact symbol at mobile, restrained grid lines, and a capped `1600px`
-shell. Keep all foreground contrast within approved handoff pairs.
+shell. Keep all foreground contrast within approved handoff pairs. Retain and
+re-theme every existing `AuthControls` and `LoginPage` state, including loading,
+signed out, signed in, disabled, and error feedback.
 
 - [ ] **Step 3: Implement the hero and network signal**
 
@@ -463,7 +477,8 @@ npm run build
 ```
 
 Expected: all commands exit `0`; tests have zero failures, ESLint has zero
-errors, and Vite completes the production build.
+errors, Vite completes the production build, and every pre-existing Firebase
+authentication test remains green.
 
 - [ ] **Step 8: Commit the visual system**
 
