@@ -27,6 +27,18 @@ BEGIN
   SELECT RAISE(ABORT, 'site_limit');
 END;
 
+CREATE TRIGGER mini_sites_limit_before_owner_update
+BEFORE UPDATE OF owner_id ON mini_sites
+WHEN (
+  SELECT COUNT(*)
+  FROM mini_sites
+  WHERE owner_id = NEW.owner_id
+    AND id <> OLD.id
+) >= 5
+BEGIN
+  SELECT RAISE(ABORT, 'site_limit');
+END;
+
 CREATE TABLE published_sites (
   slug TEXT PRIMARY KEY COLLATE NOCASE,
   site_id TEXT NOT NULL UNIQUE,
