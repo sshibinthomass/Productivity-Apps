@@ -5,7 +5,7 @@ export default defineConfig({
   base: process.env.NODE_ENV === 'production' ? '/Productivity-Apps/' : '/',
   plugins: [react()],
   test: {
-    environment: 'node',
+    environment: 'jsdom',
     globals: true,
   },
 })
