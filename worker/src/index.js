@@ -18,6 +18,7 @@ const publicAuthRoutes = new Map([
   ['POST /auth/sign-in/email', 'sign-in'],
   ['POST /auth/send-verification-email', 'resend-verification'],
   ['POST /auth/request-password-reset', 'password-reset-request'],
+  ['POST /auth/reset-password', 'reset-password'],
   ['POST /auth/sign-out', 'sign-out'],
   ['GET /auth/verify-email', 'verify-email'],
 ])
@@ -70,6 +71,17 @@ function publicUser(user) {
   }
 }
 
+function authRoute(method, pathname) {
+  const fixedRoute = publicAuthRoutes.get(`${method} ${pathname}`)
+  if (fixedRoute) return fixedRoute
+
+  if (method === 'GET' && /^\/auth\/reset-password\/[^/]+$/.test(pathname)) {
+    return 'reset-password-callback'
+  }
+
+  return null
+}
+
 async function sanitizeAuthResponse(response, route) {
   if (!response.ok || !response.headers.get('Content-Type')?.includes('application/json')) {
     return response
@@ -88,6 +100,7 @@ async function sanitizeAuthResponse(response, route) {
       break
     case 'resend-verification':
     case 'password-reset-request':
+    case 'reset-password':
       safeBody = { status: body.status === true }
       break
     case 'verify-email':
@@ -205,7 +218,7 @@ export function createWorker(dependencies = {}) {
         }
 
         if (pathname.startsWith('/auth/')) {
-          const route = publicAuthRoutes.get(`${request.method} ${pathname}`)
+          const route = authRoute(request.method, pathname)
           if (!route) {
             return withCors(request, errorResponse(new ApiError('not_found', 'Not found.', 404)), env)
           }

@@ -11,6 +11,7 @@ const appOrigin = 'https://app.shibinthomas.com'
 const devOrigin = 'http://localhost:5173'
 const email = 'person@example.com'
 const password = 'long-enough-password'
+const replacementPassword = 'replacement-password'
 
 function accountRequest(path, body, options = {}) {
   const {
@@ -39,15 +40,17 @@ function cookieFrom(response) {
 
 describe('Better Auth email sessions', () => {
   let deliveries
+  let resetDeliveries
   let worker
   let emailSender
 
   beforeEach(async () => {
     await resetDatabase(env.DB, env.TEST_MIGRATIONS)
     deliveries = []
+    resetDeliveries = []
     emailSender = {
       sendVerification: vi.fn(async (message) => deliveries.push(message)),
-      sendPasswordReset: vi.fn(),
+      sendPasswordReset: vi.fn(async (message) => resetDeliveries.push(message)),
     }
     const officialTurnstileTestValidator = (options) => verifyTurnstile({
       ...options,
@@ -223,7 +226,7 @@ describe('Better Auth email sessions', () => {
     expect(Object.keys(await first.json())).toEqual(Object.keys(await duplicate.json()))
   })
 
-  it('allows resend verification and password-reset request without exposing account existence', async () => {
+  it('delivers resend verification for an unverified real user and keeps unknown reset requests generic', async () => {
     await worker.fetch(
       accountRequest('/auth/sign-up/email', { name: 'Person', email, password }),
       env,
@@ -243,6 +246,135 @@ describe('Better Auth email sessions', () => {
     expect(resend.status).toBe(200)
     expect(reset.status).toBe(200)
     await expect(reset.json()).resolves.toEqual({ status: true })
+    expect(emailSender.sendVerification).toHaveBeenCalledTimes(2)
+    expect(emailSender.sendPasswordReset).not.toHaveBeenCalled()
+  })
+
+  it('enforces independent sign-in, resend-verification, and reset-request limits', async () => {
+    await worker.fetch(
+      accountRequest('/auth/sign-up/email', { name: 'Person', email, password }),
+      env,
+      createExecutionContext(),
+    )
+    await worker.fetch(
+      new Request(deliveries[0].url, { headers: { Origin: appOrigin } }),
+      env,
+      createExecutionContext(),
+    )
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const response = await worker.fetch(
+        accountRequest('/auth/sign-in/email', { email, password: 'incorrect-password' }),
+        env,
+        createExecutionContext(),
+      )
+      expect(response.status).toBe(401)
+    }
+    const blockedSignIn = await worker.fetch(
+      accountRequest('/auth/sign-in/email', { email, password: 'incorrect-password' }),
+      env,
+      createExecutionContext(),
+    )
+    expect(blockedSignIn.status).toBe(429)
+
+    const unverifiedEmail = 'unverified@example.com'
+    await worker.fetch(
+      accountRequest('/auth/sign-up/email', { name: 'Unverified', email: unverifiedEmail, password }),
+      env,
+      createExecutionContext(),
+    )
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const response = await worker.fetch(
+        accountRequest('/auth/send-verification-email', { email: unverifiedEmail }),
+        env,
+        createExecutionContext(),
+      )
+      expect(response.status).toBe(200)
+    }
+    const blockedResend = await worker.fetch(
+      accountRequest('/auth/send-verification-email', { email: unverifiedEmail }),
+      env,
+      createExecutionContext(),
+    )
+    expect(blockedResend.status).toBe(429)
+    expect(emailSender.sendVerification).toHaveBeenCalledTimes(5)
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const response = await worker.fetch(
+        accountRequest('/auth/request-password-reset', { email }),
+        env,
+        createExecutionContext(),
+      )
+      expect(response.status).toBe(200)
+    }
+    const blockedReset = await worker.fetch(
+      accountRequest('/auth/request-password-reset', { email }),
+      env,
+      createExecutionContext(),
+    )
+    expect(blockedReset.status).toBe(429)
+    expect(emailSender.sendPasswordReset).toHaveBeenCalledTimes(3)
+  })
+
+  it('completes Better Auth password reset through its callback route without exposing a token in JSON', async () => {
+    await worker.fetch(
+      accountRequest('/auth/sign-up/email', { name: 'Person', email, password }),
+      env,
+      createExecutionContext(),
+    )
+    await worker.fetch(
+      new Request(deliveries[0].url, { headers: { Origin: appOrigin } }),
+      env,
+      createExecutionContext(),
+    )
+    const requested = await worker.fetch(
+      accountRequest('/auth/request-password-reset', {
+        email,
+        redirectTo: `${appOrigin}/reset-password`,
+      }),
+      env,
+      createExecutionContext(),
+    )
+    expect(requested.status).toBe(200)
+    expect(resetDeliveries).toHaveLength(1)
+
+    const resetLink = new URL(resetDeliveries[0].url)
+    const callback = await worker.fetch(
+      new Request(resetLink, { headers: { Origin: appOrigin } }),
+      env,
+      createExecutionContext(),
+    )
+    const applicationResetUrl = new URL(callback.headers.get('Location'))
+    const token = applicationResetUrl.searchParams.get('token')
+    expect(callback.status).toBe(302)
+    expect(applicationResetUrl.origin).toBe(appOrigin)
+    expect(token).toEqual(expect.any(String))
+
+    const completed = await worker.fetch(
+      accountRequest('/auth/reset-password', { token, newPassword: replacementPassword }),
+      env,
+      createExecutionContext(),
+    )
+    expect(completed.status).toBe(200)
+    await expect(completed.json()).resolves.toEqual({ status: true })
+
+    const oldPassword = await worker.fetch(
+      accountRequest('/auth/sign-in/email', { email, password }),
+      env,
+      createExecutionContext(),
+    )
+    expect(oldPassword.status).toBe(401)
+
+    const newPassword = await worker.fetch(
+      accountRequest('/auth/sign-in/email', { email, password: replacementPassword }),
+      env,
+      createExecutionContext(),
+    )
+    const body = await newPassword.json()
+    expect(newPassword.status).toBe(200)
+    expect(body).toEqual({ user: expect.objectContaining({ email }) })
+    expect(JSON.stringify(body)).not.toMatch(/token|session|account/i)
+    expect(newPassword.headers.get('Set-Cookie')).toContain('HttpOnly')
   })
 
   it('does not expose Better Auth session introspection routes', async () => {
