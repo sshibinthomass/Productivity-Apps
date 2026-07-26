@@ -328,7 +328,7 @@ function Field({ field, values, error, onChange, type }) {
       ) : (
         <input
           {...sharedProps}
-          autoComplete={field.autoComplete}
+          autoComplete={field.autoComplete ?? 'off'}
           inputMode={field.inputMode}
           min={field.min}
           placeholder={field.placeholder}

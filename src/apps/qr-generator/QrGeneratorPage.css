@@ -869,10 +869,6 @@
     max-width: 48rem;
   }
 
-  .qr-proof {
-    grid-row: 1;
-  }
-
   .qr-proof__sticky {
     position: static;
   }
@@ -894,7 +890,6 @@
 }
 
 @media (max-width: 620px) {
-  .qr-type-grid,
   .qr-content-form,
   .qr-design-controls,
   .qr-export-actions {
@@ -948,7 +943,12 @@
   }
 
   .qr-type-button {
-    min-height: 5.4rem;
+    min-height: 4.2rem;
+    padding: var(--space-3);
+  }
+
+  .qr-type-button small {
+    display: none;
   }
 
   .qr-logo-control__active {
