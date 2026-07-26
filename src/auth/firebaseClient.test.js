@@ -10,7 +10,7 @@ describe('readFirebaseConfig', () => {
     expect(readFirebaseConfig({})).toEqual({
       config: null,
       configurationError:
-        'Firebase sign-in is not configured. Add VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, and VITE_FIREBASE_APP_ID.',
+        'Firebase is not configured. Add VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_APP_ID, and VITE_FIREBASE_STORAGE_BUCKET.',
     })
   })
 
@@ -21,6 +21,7 @@ describe('readFirebaseConfig', () => {
         VITE_FIREBASE_AUTH_DOMAIN: 'example.firebaseapp.com',
         VITE_FIREBASE_PROJECT_ID: 'example',
         VITE_FIREBASE_APP_ID: 'app-id',
+        VITE_FIREBASE_STORAGE_BUCKET: 'example.firebasestorage.app',
       }),
     ).toEqual({
       config: {
@@ -28,6 +29,7 @@ describe('readFirebaseConfig', () => {
         authDomain: 'example.firebaseapp.com',
         projectId: 'example',
         appId: 'app-id',
+        storageBucket: 'example.firebasestorage.app',
       },
       configurationError: null,
     })
@@ -37,6 +39,17 @@ describe('readFirebaseConfig', () => {
     expect(
       readFirebaseConfig({
         VITE_FIREBASE_API_KEY: ' ',
+        VITE_FIREBASE_AUTH_DOMAIN: 'example.firebaseapp.com',
+        VITE_FIREBASE_PROJECT_ID: 'example',
+        VITE_FIREBASE_APP_ID: 'app-id',
+      }).config,
+    ).toBeNull()
+  })
+
+  it('requires a Storage bucket for image publishing', () => {
+    expect(
+      readFirebaseConfig({
+        VITE_FIREBASE_API_KEY: 'key',
         VITE_FIREBASE_AUTH_DOMAIN: 'example.firebaseapp.com',
         VITE_FIREBASE_PROJECT_ID: 'example',
         VITE_FIREBASE_APP_ID: 'app-id',
@@ -134,6 +147,7 @@ describe('createFirebaseClient', () => {
         VITE_FIREBASE_AUTH_DOMAIN: 'example.firebaseapp.com',
         VITE_FIREBASE_PROJECT_ID: 'example',
         VITE_FIREBASE_APP_ID: 'app-id',
+        VITE_FIREBASE_STORAGE_BUCKET: 'example.firebasestorage.app',
         VITE_FIREBASE_APP_CHECK_SITE_KEY: 'enterprise-key',
         VITE_FIREBASE_FUNCTIONS_REGION: 'europe-west1',
       },
@@ -180,6 +194,7 @@ describe('createFirebaseClient', () => {
         VITE_FIREBASE_AUTH_DOMAIN: 'example.firebaseapp.com',
         VITE_FIREBASE_PROJECT_ID: 'example',
         VITE_FIREBASE_APP_ID: 'app-id',
+        VITE_FIREBASE_STORAGE_BUCKET: 'example.firebasestorage.app',
       },
       sdk,
     )
