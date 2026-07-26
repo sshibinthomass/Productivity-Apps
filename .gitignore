@@ -4,3 +4,5 @@ dist/
 .playwright-cli/
 output/
 *.local
+*-debug.log
+.firebase/

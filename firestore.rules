@@ -1,0 +1,73 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedInAs(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function updatesOnlyEditableDraftFields() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'name',
+        'templateId',
+        'blocks',
+        'theme',
+        'seo',
+        'draftRevision',
+        'updatedAt'
+      ]);
+    }
+
+    function validDraftUpdate() {
+      return request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.blocks is list
+        && request.resource.data.blocks.size() <= 40
+        && request.resource.data.theme is map
+        && request.resource.data.seo is map
+        && request.resource.data.draftRevision is int
+        && request.resource.data.draftRevision == resource.data.draftRevision + 1;
+    }
+
+    match /users/{userId}/sites/{siteId} {
+      allow get, list: if signedInAs(userId);
+      allow update: if signedInAs(userId)
+        && updatesOnlyEditableDraftFields()
+        && validDraftUpdate();
+      allow create, delete: if false;
+
+      match /analytics/{documentId} {
+        allow get, list: if signedInAs(userId);
+        allow write: if false;
+      }
+
+      match /analyticsDays/{documentId} {
+        allow get, list: if signedInAs(userId);
+        allow write: if false;
+      }
+    }
+
+    match /users/{userId}/private/{documentId} {
+      allow get: if signedInAs(userId);
+      allow list, write: if false;
+    }
+
+    match /publishedMiniSites/{slug} {
+      allow get: if true;
+      allow list, write: if false;
+    }
+
+    match /miniSiteSlugs/{slug} {
+      allow read, write: if false;
+    }
+
+    match /miniSiteEventReceipts/{receiptId} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
