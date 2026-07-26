@@ -8,7 +8,7 @@ import { ApiError, errorResponse } from './http/errors.js'
 import { requireUser } from './auth/session.js'
 import { createD1Store } from './sites/d1Store.js'
 import { createMiniSiteService } from './sites/service.js'
-import { createSiteRoutes } from './sites/routes.js'
+import { createSiteRoutes, requiresJsonSiteBody } from './sites/routes.js'
 
 const consentVersion = '2026-07-26'
 const protectedAuthRoutes = new Map([
@@ -35,6 +35,14 @@ function clientNetwork(request) {
   return request.headers.get('CF-Connecting-IP')
     ?? request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim()
     ?? 'unknown'
+}
+
+function isUnsafeMethod(method) {
+  return !['GET', 'HEAD', 'OPTIONS'].includes(method)
+}
+
+function isJsonContentType(request) {
+  return /^application\/json(?:\s*;|$)/i.test(request.headers.get('Content-Type') ?? '')
 }
 
 async function requestBody(request) {
@@ -245,6 +253,12 @@ export function createWorker(dependencies = {}) {
         }
 
         if (pathname === '/v1/sites' || pathname.startsWith('/v1/sites/')) {
+          if (isUnsafeMethod(request.method) && !isAllowedOrigin(request.headers.get('Origin'), env)) {
+            return withCors(request, errorResponse(new ApiError('invalid_origin', 'Invalid request origin.', 403)), env)
+          }
+          if (requiresJsonSiteBody(request) && !isJsonContentType(request)) {
+            return withCors(request, errorResponse(new ApiError('unsupported_media_type', 'Use application/json for this request.', 415)), env)
+          }
           const auth = createAuth(env, { email: dependencies.email })
           const store = createD1Store({ db: env.DB })
           const routes = createSiteRoutes({

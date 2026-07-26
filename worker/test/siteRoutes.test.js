@@ -18,9 +18,9 @@ function siteInput(overrides = {}) {
   return { name: 'Maya Studio', slug: 'maya-studio', templateId: 'creator', ...overrides }
 }
 
-function request(path, { method = 'GET', json, cookie, origin = appOrigin, body } = {}) {
+function request(path, { method = 'GET', json, cookie, origin = appOrigin, body, contentType } = {}) {
   const headers = { Origin: origin, ...(cookie ? { Cookie: cookie } : {}) }
-  if (json !== undefined) headers['Content-Type'] = 'application/json'
+  if (json !== undefined || contentType) headers['Content-Type'] = contentType ?? 'application/json'
   return new Request(`${apiOrigin}${path}`, {
     method,
     headers,
@@ -211,6 +211,7 @@ describe('authenticated mini-site routes', () => {
     const response = await authenticated('/v1/sites', {
       method: 'POST',
       body: `{${'x'.repeat(1024 * 1024 + 1)}`,
+      contentType: 'application/json',
     })
 
     expect(response.status).toBe(413)
@@ -226,6 +227,98 @@ describe('authenticated mini-site routes', () => {
     expect(accepted.headers.get('Access-Control-Allow-Origin')).toBe(appOrigin)
     expect(accepted.headers.get('Access-Control-Allow-Credentials')).toBe('true')
     expect(rejected.headers.get('Access-Control-Allow-Origin')).toBeNull()
+  })
+
+  it.each([
+    'https://attacker.example',
+    'https://evil.shibinthomas.com',
+    'https://app.shibinthomas.com.attacker.example',
+  ])('rejects a mutating management request from %s before D1 changes', async (origin) => {
+    const response = await authenticated('/v1/sites', {
+      method: 'POST', json: siteInput(), origin,
+    })
+
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'invalid_origin' } })
+    await expect(env.DB.prepare('SELECT COUNT(*) AS count FROM mini_sites').first()).resolves.toEqual({ count: 0 })
+  })
+
+  it('requires application/json for a create request before D1 changes', async () => {
+    const response = await authenticated('/v1/sites', {
+      method: 'POST', body: JSON.stringify(siteInput()), contentType: 'text/plain',
+    })
+
+    expect(response.status).toBe(415)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'unsupported_media_type' } })
+    await expect(env.DB.prepare('SELECT COUNT(*) AS count FROM mini_sites').first()).resolves.toEqual({ count: 0 })
+  })
+
+  it('requires application/json before a bodyless publish or unpublish can change a site', async () => {
+    const site = await createSite()
+    const responses = await Promise.all([
+      authenticated(`/v1/sites/${site.siteId}/publish`, { method: 'POST' }),
+      authenticated(`/v1/sites/${site.siteId}/unpublish`, { method: 'POST' }),
+    ])
+
+    for (const response of responses) {
+      expect(response.status).toBe(415)
+      await expect(response.json()).resolves.toMatchObject({ error: { code: 'unsupported_media_type' } })
+    }
+    await expect(env.DB.prepare('SELECT status, published_at FROM mini_sites WHERE id = ?').bind(site.siteId).first()).resolves.toEqual({
+      status: 'draft', published_at: null,
+    })
+  })
+
+  it('denies signed-out item routes without changing the owned site', async () => {
+    const site = await createSite()
+    const draft = {
+      name: 'Changed', templateId: site.templateId,
+      blocks: [{ id: 'link-1', type: 'link', visible: true, content: { label: 'Portfolio', url: 'https://example.com', supportingText: '', icon: '' } }],
+      theme: {}, seo: { title: 'Changed', description: '', socialImagePath: null },
+    }
+    const operations = [
+      ['GET', `/v1/sites/${site.siteId}`],
+      ['PUT', `/v1/sites/${site.siteId}`, { expectedRevision: site.draftRevision, draft }],
+      ['POST', `/v1/sites/${site.siteId}/duplicate`, siteInput({ name: 'Copy', slug: 'maya-copy' })],
+      ['PUT', `/v1/sites/${site.siteId}/slug`, { slug: 'maya-renamed' }],
+      ['POST', `/v1/sites/${site.siteId}/publish`, {}],
+      ['POST', `/v1/sites/${site.siteId}/unpublish`, {}],
+      ['DELETE', `/v1/sites/${site.siteId}`, { confirmationName: site.name }],
+      ['GET', `/v1/sites/${site.siteId}/analytics`],
+    ]
+
+    const before = await env.DB.prepare('SELECT name, slug, status, draft_revision FROM mini_sites WHERE id = ?').bind(site.siteId).first()
+    for (const [method, path, json] of operations) {
+      const response = await send(path, { method, ...(json === undefined ? {} : { json }) })
+      expect(response.status).toBe(401)
+      await expect(response.json()).resolves.toMatchObject({ error: { code: 'unauthenticated' } })
+      await expect(env.DB.prepare('SELECT name, slug, status, draft_revision FROM mini_sites WHERE id = ?').bind(site.siteId).first()).resolves.toEqual(before)
+    }
+  })
+
+  it("denies cross-owner item mutations without changing the owner's site", async () => {
+    const site = await createSite()
+    const draft = {
+      name: 'Changed', templateId: site.templateId,
+      blocks: [{ id: 'link-1', type: 'link', visible: true, content: { label: 'Portfolio', url: 'https://example.com', supportingText: '', icon: '' } }],
+      theme: {}, seo: { title: 'Changed', description: '', socialImagePath: null },
+    }
+    const operations = [
+      ['PUT', `/v1/sites/${site.siteId}`, { expectedRevision: site.draftRevision, draft }],
+      ['POST', `/v1/sites/${site.siteId}/duplicate`, siteInput({ name: 'Copy', slug: 'maya-copy' })],
+      ['PUT', `/v1/sites/${site.siteId}/slug`, { slug: 'maya-renamed' }],
+      ['POST', `/v1/sites/${site.siteId}/publish`, {}],
+      ['POST', `/v1/sites/${site.siteId}/unpublish`, {}],
+      ['DELETE', `/v1/sites/${site.siteId}`, { confirmationName: site.name }],
+    ]
+
+    const before = await env.DB.prepare('SELECT name, slug, status, draft_revision FROM mini_sites WHERE id = ?').bind(site.siteId).first()
+    for (const [method, path, json] of operations) {
+      const response = await send(path, { method, json, cookie: 'session=other' })
+      expect(response.status).toBe(404)
+      await expect(response.json()).resolves.toMatchObject({ error: { code: 'not_found' } })
+      await expect(env.DB.prepare('SELECT name, slug, status, draft_revision FROM mini_sites WHERE id = ?').bind(site.siteId).first()).resolves.toEqual(before)
+    }
   })
 
   it('does not leak D1 failures through management responses', async () => {

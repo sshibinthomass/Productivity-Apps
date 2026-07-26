@@ -23,6 +23,18 @@ function sitePath(pathname) {
   return { siteId: safeSiteId(match[1]), action: match[2] ?? null }
 }
 
+export function requiresJsonSiteBody(request) {
+  const { pathname } = new URL(request.url)
+  if (pathname === '/v1/sites') return request.method === 'POST'
+  const match = /^\/v1\/sites\/[^/]+(?:\/(duplicate|slug|publish|unpublish|analytics))?$/.exec(pathname)
+  if (!match) return false
+  const action = match[1] ?? null
+  return (!action && ['PUT', 'DELETE'].includes(request.method))
+    || (action === 'duplicate' && request.method === 'POST')
+    || (action === 'slug' && request.method === 'PUT')
+    || (['publish', 'unpublish'].includes(action) && request.method === 'POST')
+}
+
 async function readJson(request) {
   const contentLength = Number(request.headers.get('Content-Length'))
   if (Number.isFinite(contentLength) && contentLength > MAX_JSON_BYTES) {
@@ -55,10 +67,6 @@ export function createSiteRoutes({ auth, store, service = createMiniSiteService(
   }
 
   return {
-    matches(pathname) {
-      return pathname === '/v1/sites' || pathname.startsWith('/v1/sites/')
-    },
-
     async handle(request) {
       const { pathname } = new URL(request.url)
       const path = sitePath(pathname)
