@@ -1,5 +1,6 @@
 import MultiLinkOpenerPage from '../apps/multi-link-opener/MultiLinkOpenerPage.jsx'
 import LinkIcon from '../components/icons/LinkIcon.jsx'
+import { NotesIcon, TextIcon, TimerIcon } from '../components/icons/AppIcons.jsx'
 
 export const appRegistry = [
   {
@@ -7,10 +8,61 @@ export const appRegistry = [
     title: 'Multi Link Opener',
     description:
       'Paste a stack of links and launch every destination in its own tab.',
+    category: 'Browser workflow',
+    status: 'available',
     path: '/multi-link-opener',
     icon: LinkIcon,
-    accent: 'violet',
+    accent: 'mint',
     requiresAuth: false,
     component: MultiLinkOpenerPage,
   },
+  {
+    id: 'text-formatter',
+    title: 'Text Formatter',
+    description:
+      'Clean, reshape, and prepare copied text for the next place it needs to go.',
+    category: 'Writing utility',
+    status: 'coming-soon',
+    path: null,
+    icon: TextIcon,
+    accent: 'violet',
+    requiresAuth: false,
+    component: null,
+  },
+  {
+    id: 'focus-timer',
+    title: 'Focus Timer',
+    description:
+      'Set a clear work interval and keep the current task in view.',
+    category: 'Focus utility',
+    status: 'coming-soon',
+    path: null,
+    icon: TimerIcon,
+    accent: 'violet',
+    requiresAuth: false,
+    component: null,
+  },
+  {
+    id: 'quick-notes',
+    title: 'Quick Notes',
+    description:
+      'Capture a thought quickly and keep it ready for the rest of your workflow.',
+    category: 'Capture utility',
+    status: 'coming-soon',
+    path: null,
+    icon: NotesIcon,
+    accent: 'violet',
+    requiresAuth: true,
+    component: null,
+  },
 ]
+
+export function isRoutableApp(app) {
+  return (
+    app.status === 'available' &&
+    typeof app.path === 'string' &&
+    typeof app.component === 'function'
+  )
+}
+
+export const availableApps = appRegistry.filter(isRoutableApp)

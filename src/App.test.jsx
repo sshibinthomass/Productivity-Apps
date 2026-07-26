@@ -52,6 +52,7 @@ describe('App authentication routes', () => {
       {
         id: 'private-fixture',
         path: '/private-fixture',
+        status: 'available',
         requiresAuth: true,
         component: PrivateFixture,
       },

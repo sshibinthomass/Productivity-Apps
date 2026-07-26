@@ -1,18 +1,20 @@
 import { Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './auth/ProtectedRoute.jsx'
 import Layout from './components/Layout.jsx'
-import { appRegistry } from './config/appRegistry.jsx'
+import { appRegistry, isRoutableApp } from './config/appRegistry.jsx'
 import HomePage from './pages/HomePage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
 
 export default function App({ registry = appRegistry }) {
+  const routableApps = registry.filter(isRoutableApp)
+
   return (
     <Layout>
       <Routes>
         <Route index element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
-        {registry.map((app) => {
+        {routableApps.map((app) => {
           const Page = app.component
           const page = <Page />
 
