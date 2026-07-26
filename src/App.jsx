@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
 import PublicMiniSitePage from './apps/mini-site-builder/PublicMiniSitePage.jsx'
 import NewMiniSitePage from './apps/mini-site-builder/NewMiniSitePage.jsx'
+import MiniSiteStudioPage from './apps/mini-site-builder/studio/MiniSiteStudioPage.jsx'
 
 export default function App({ registry = appRegistry }) {
   const routableApps = registry.filter(isRoutableApp)
@@ -22,6 +23,14 @@ export default function App({ registry = appRegistry }) {
           element={
             <ProtectedRoute>
               <NewMiniSitePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/mini-sites/:siteId/edit"
+          element={
+            <ProtectedRoute>
+              <MiniSiteStudioPage />
             </ProtectedRoute>
           }
         />

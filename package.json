@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest",
-    "test:run": "vitest run",
+    "test:run": "vitest run src functions",
     "test:firebase": "firebase emulators:exec --project demo-mini-sites --only firestore,storage \"vitest run firebase-tests/rules.test.js\"",
     "emulators": "firebase emulators:start --project demo-mini-sites --only auth,firestore,storage,functions",
     "lint": "eslint ."

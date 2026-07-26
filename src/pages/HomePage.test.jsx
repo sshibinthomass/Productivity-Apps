@@ -24,7 +24,7 @@ describe('HomePage', () => {
     ).toBeTruthy()
 
     const availability = screen.getByLabelText('Application availability')
-    expect(availability.textContent).toContain('3 available now')
+    expect(availability.textContent).toContain('4 available now')
     expect(availability.textContent).toContain('3 coming soon')
     expect(screen.getByText('Multi Link Opener')).toBeTruthy()
     expect(screen.getByText('JSON Formatter')).toBeTruthy()
