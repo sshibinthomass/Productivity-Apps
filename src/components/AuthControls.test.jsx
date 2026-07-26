@@ -36,6 +36,7 @@ describe('AuthControls', () => {
     useAuth.mockReturnValue({
       user: null,
       isAuthLoading: false,
+      authError: null,
       signOutUser: vi.fn(),
     })
 
@@ -52,6 +53,23 @@ describe('AuthControls', () => {
     ).toBe('/login')
   })
 
+  it('surfaces authentication configuration failures from the header', () => {
+    useAuth.mockReturnValue({
+      user: null,
+      isAuthLoading: false,
+      authError: 'Firebase sign-in is not configured.',
+      signOutUser: vi.fn(),
+    })
+
+    render(
+      <MemoryRouter>
+        <AuthControls />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('alert').textContent).toContain('not configured')
+  })
+
   it('shows the signed-in identity and signs out from the header', async () => {
     const signOutUser = vi.fn().mockResolvedValue(true)
     useAuth.mockReturnValue({
@@ -62,6 +80,7 @@ describe('AuthControls', () => {
         photoURL: 'https://example.com/ada.png',
       },
       isAuthLoading: false,
+      authError: null,
       signOutUser,
     })
 
@@ -83,6 +102,36 @@ describe('AuthControls', () => {
     })
   })
 
+  it('keeps a failed sign-out visible and retryable', async () => {
+    const signOutUser = vi.fn().mockResolvedValue(false)
+    useAuth.mockReturnValue({
+      user: {
+        uid: 'user-1',
+        displayName: 'Ada Lovelace',
+        email: 'ada@example.com',
+        photoURL: null,
+      },
+      isAuthLoading: false,
+      authError: null,
+      signOutUser,
+    })
+
+    render(
+      <MemoryRouter>
+        <AuthControls />
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toContain(
+        'could not sign you out',
+      )
+      expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy()
+    })
+  })
+
   it('uses the email when Google has no display name or profile image', () => {
     useAuth.mockReturnValue({
       user: {
@@ -92,6 +141,7 @@ describe('AuthControls', () => {
         photoURL: null,
       },
       isAuthLoading: false,
+      authError: null,
       signOutUser: vi.fn(),
     })
 

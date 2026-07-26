@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/authContext.js'
 
 export default function AuthControls() {
-  const { user, isAuthLoading, signOutUser } = useAuth()
+  const { user, isAuthLoading, authError, signOutUser } = useAuth()
   const [isSigningOut, setIsSigningOut] = useState(false)
+  const [signOutError, setSignOutError] = useState(null)
+  const visibleError = authError || signOutError
 
   if (isAuthLoading) {
     return (
@@ -20,9 +22,16 @@ export default function AuthControls() {
 
   if (!user) {
     return (
-      <Link className="auth-link" to="/login">
-        Sign in with Google
-      </Link>
+      <div className="auth-controls">
+        <Link className="auth-link" to="/login">
+          Sign in with Google
+        </Link>
+        {visibleError && (
+          <span className="auth-controls__error" role="alert">
+            {visibleError}
+          </span>
+        )}
+      </div>
     )
   }
 
@@ -30,9 +39,14 @@ export default function AuthControls() {
 
   async function handleSignOut() {
     setIsSigningOut(true)
+    setSignOutError(null)
 
     try {
-      await signOutUser()
+      const didSignOut = await signOutUser()
+
+      if (!didSignOut) {
+        setSignOutError('Google could not sign you out. Please try again.')
+      }
     } finally {
       setIsSigningOut(false)
     }
@@ -59,6 +73,11 @@ export default function AuthControls() {
       >
         {isSigningOut ? 'Signing out…' : 'Sign out'}
       </button>
+      {visibleError && (
+        <span className="auth-controls__error" role="alert">
+          {visibleError}
+        </span>
+      )}
     </div>
   )
 }

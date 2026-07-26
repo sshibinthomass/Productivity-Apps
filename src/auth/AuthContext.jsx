@@ -8,7 +8,16 @@ import { AuthContext } from './authContext.js'
 import {
   firebaseClient,
   getAuthErrorMessage,
+  isUnexpectedAuthError,
 } from './firebaseClient.js'
+
+function describeAuthError(error, action) {
+  if (import.meta.env.DEV && isUnexpectedAuthError(error)) {
+    console.error('Unexpected Firebase authentication error.', error)
+  }
+
+  return getAuthErrorMessage(error, action)
+}
 
 export function AuthProvider({ children, client = firebaseClient }) {
   const [user, setUser] = useState(null)
@@ -32,7 +41,7 @@ export function AuthProvider({ children, client = firebaseClient }) {
       (error) => {
         setUser(null)
         setIsAuthLoading(false)
-        setAuthError(getAuthErrorMessage(error))
+        setAuthError(describeAuthError(error, 'observe'))
       },
     )
   }, [client])
@@ -44,7 +53,7 @@ export function AuthProvider({ children, client = firebaseClient }) {
       const credential = await client.signInWithGoogle()
       return credential.user
     } catch (error) {
-      setAuthError(getAuthErrorMessage(error))
+      setAuthError(describeAuthError(error, 'signIn'))
       return null
     }
   }, [client])
@@ -56,7 +65,7 @@ export function AuthProvider({ children, client = firebaseClient }) {
       await client.signOutUser()
       return true
     } catch (error) {
-      setAuthError(getAuthErrorMessage(error))
+      setAuthError(describeAuthError(error, 'signOut'))
       return false
     }
   }, [client])

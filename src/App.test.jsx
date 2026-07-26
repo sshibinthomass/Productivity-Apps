@@ -12,7 +12,7 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-function renderAt(path) {
+function renderAt(path, registry) {
   useAuth.mockReturnValue({
     user: null,
     isAuthLoading: false,
@@ -23,7 +23,7 @@ function renderAt(path) {
 
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <App />
+      <App registry={registry} />
     </MemoryRouter>,
   )
 }
@@ -44,5 +44,24 @@ describe('App authentication routes', () => {
     expect(
       screen.queryByRole('button', { name: 'Continue with Google' }),
     ).toBeNull()
+  })
+
+  it('applies the protected-route boundary to opted-in registry apps', () => {
+    const PrivateFixture = () => <p>Private fixture app</p>
+    const protectedRegistry = [
+      {
+        id: 'private-fixture',
+        path: '/private-fixture',
+        requiresAuth: true,
+        component: PrivateFixture,
+      },
+    ]
+
+    renderAt('/private-fixture', protectedRegistry)
+
+    expect(
+      screen.getByRole('button', { name: 'Continue with Google' }),
+    ).toBeTruthy()
+    expect(screen.queryByText('Private fixture app')).toBeNull()
   })
 })

@@ -6,13 +6,13 @@ import HomePage from './pages/HomePage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
 
-export default function App() {
+export default function App({ registry = appRegistry }) {
   return (
     <Layout>
       <Routes>
         <Route index element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
-        {appRegistry.map((app) => {
+        {registry.map((app) => {
           const Page = app.component
           const page = <Page />
 

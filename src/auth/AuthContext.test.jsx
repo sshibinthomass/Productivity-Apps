@@ -159,6 +159,58 @@ describe('AuthProvider', () => {
     })
   })
 
+  it('uses a sign-out-specific message when sign-out fails', async () => {
+    const fake = createClient({
+      signOutUser: async () => {
+        throw { code: 'auth/network-request-failed' }
+      },
+    })
+    render(
+      <AuthProvider client={fake.client}>
+        <AuthHarness />
+      </AuthProvider>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toContain(
+        'signing you out',
+      )
+      expect(screen.getByTestId('action-result').textContent).toBe(
+        'sign-out-failed',
+      )
+    })
+  })
+
+  it('retains unexpected Firebase errors in development diagnostics', async () => {
+    const originalError = new Error('Unexpected provider failure')
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {})
+    const fake = createClient({
+      signInWithGoogle: async () => {
+        throw originalError
+      },
+    })
+    render(
+      <AuthProvider client={fake.client}>
+        <AuthHarness />
+      </AuthProvider>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    await waitFor(() => {
+      expect(consoleError).toHaveBeenCalledWith(
+        'Unexpected Firebase authentication error.',
+        originalError,
+      )
+    })
+
+    consoleError.mockRestore()
+  })
+
   it('unsubscribes from Firebase when the provider unmounts', () => {
     const fake = createClient()
     const view = render(

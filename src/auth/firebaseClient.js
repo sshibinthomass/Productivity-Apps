@@ -17,6 +17,15 @@ const REQUIRED_CONFIG = [
 const CONFIGURATION_ERROR =
   'Firebase sign-in is not configured. Add VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, and VITE_FIREBASE_APP_ID.'
 
+const EXPECTED_AUTH_ERROR_CODES = new Set([
+  'auth/popup-blocked',
+  'auth/popup-closed-by-user',
+  'auth/cancelled-popup-request',
+  'auth/network-request-failed',
+  'auth/unauthorized-domain',
+  'auth/configuration-not-found',
+])
+
 const firebaseSdk = {
   getApp,
   getApps,
@@ -52,7 +61,23 @@ export function readFirebaseConfig(env) {
   }
 }
 
-export function getAuthErrorMessage(error) {
+export function isUnexpectedAuthError(error) {
+  return !EXPECTED_AUTH_ERROR_CODES.has(error?.code)
+}
+
+export function getAuthErrorMessage(error, action = 'signIn') {
+  if (action === 'signOut') {
+    if (error?.code === 'auth/configuration-not-found') {
+      return CONFIGURATION_ERROR
+    }
+
+    if (error?.code === 'auth/network-request-failed') {
+      return 'A network problem prevented Google from signing you out. Check your connection and try again.'
+    }
+
+    return 'Google could not sign you out. Please try again.'
+  }
+
   switch (error?.code) {
     case 'auth/popup-blocked':
       return 'Your browser blocked the Google sign-in window. Please allow pop-ups for this site and try again.'

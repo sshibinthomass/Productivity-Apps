@@ -172,7 +172,9 @@ a {
 .auth-controls {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
   gap: 0.7rem;
+  justify-content: flex-end;
 }
 
 .auth-controls--loading {
@@ -206,6 +208,16 @@ a {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.auth-controls__error {
+  color: #ffb4a2;
+  flex-basis: 100%;
+  font-family: var(--font-utility);
+  font-size: 0.62rem;
+  line-height: 1.4;
+  max-width: 20rem;
+  text-align: right;
 }
 
 .auth-sign-out {
@@ -762,7 +774,12 @@ a:focus-visible {
   }
 
   .auth-controls__name {
-    display: none;
+    font-size: 0.68rem;
+    max-width: 5.5rem;
+  }
+
+  .auth-controls__error {
+    max-width: 12rem;
   }
 
   .login-card {

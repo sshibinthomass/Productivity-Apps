@@ -57,6 +57,15 @@ describe('getAuthErrorMessage', () => {
   ])('maps %s to a recoverable message', (code, expectedText) => {
     expect(getAuthErrorMessage({ code }).toLowerCase()).toContain(expectedText)
   })
+
+  it('uses action-specific language for sign-out failures', () => {
+    expect(
+      getAuthErrorMessage(
+        { code: 'auth/network-request-failed' },
+        'signOut',
+      ).toLowerCase(),
+    ).toContain('signing you out')
+  })
 })
 
 describe('createFirebaseClient', () => {
