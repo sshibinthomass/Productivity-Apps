@@ -9,6 +9,7 @@ describe('appRegistry', () => {
       title: 'Multi Link Opener',
       path: '/multi-link-opener',
       accent: 'violet',
+      requiresAuth: false,
     })
     expect(typeof appRegistry[0].component).toBe('function')
     expect(typeof appRegistry[0].icon).toBe('function')
@@ -20,5 +21,11 @@ describe('appRegistry', () => {
 
     expect(new Set(ids).size).toBe(ids.length)
     expect(new Set(paths).size).toBe(paths.length)
+  })
+
+  it('requires every app to declare whether authentication is needed', () => {
+    expect(
+      appRegistry.every((app) => typeof app.requiresAuth === 'boolean'),
+    ).toBe(true)
   })
 })

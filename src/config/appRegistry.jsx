@@ -10,6 +10,7 @@ export const appRegistry = [
     path: '/multi-link-opener',
     icon: LinkIcon,
     accent: 'violet',
+    requiresAuth: false,
     component: MultiLinkOpenerPage,
   },
 ]

@@ -2,6 +2,10 @@
 
 A growing collection of focused React tools in one Vite application.
 
+The site supports optional Google sign-in through Firebase Authentication.
+Multi Link Opener and the home page remain public; future tools can opt into
+the shared account session through registry metadata.
+
 ## Included apps
 
 - **Multi Link Opener** — paste one link per line and open every valid
@@ -19,6 +23,15 @@ Node.js 22.12 or newer is required.
 ```bash
 npm install
 npm run dev
+```
+
+Create `.env.local` from `.env.example` before testing Google sign-in:
+
+```dotenv
+VITE_FIREBASE_API_KEY=your-web-api-key
+VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your-project-id
+VITE_FIREBASE_APP_ID=your-web-app-id
 ```
 
 Quality checks:
@@ -56,8 +69,32 @@ To add another tool:
 2. Keep its tool-specific styles, helpers, and tests in the same folder.
 3. Add its title, description, icon, path, accent, and component to
    `src/config/appRegistry.jsx`.
+4. Set `requiresAuth: false` for a public tool or `requiresAuth: true` for a
+   tool that needs a signed-in Google account.
 
 The registry automatically supplies both the home-page card and the route.
+Only protected registry entries redirect signed-out visitors to `/login`.
+Client-side route protection is not a backend authorization boundary; future
+databases or APIs must independently enforce access.
+
+## Firebase Authentication
+
+Use one Firebase project for the complete Productivity Apps suite:
+
+1. Open the [Firebase Console](https://console.firebase.google.com/) and create
+   a project named **Productivity Apps**.
+2. Register a Web app named **Productivity Apps Web**.
+3. Under **Authentication → Sign-in method**, enable **Google** and select the
+   project owner's email as the support email.
+4. Under **Authentication → Settings → Authorized domains**, confirm
+   `localhost` is present for development and add
+   `sshibinthomass.github.io` for GitHub Pages.
+5. Copy the Web app's `apiKey`, `authDomain`, `projectId`, and `appId` into
+   `.env.local` using the variable names above.
+
+The Firebase Web configuration is a public project identifier. Never add a
+service-account file, Admin SDK key, OAuth client secret, or other private
+credential to this browser application.
 
 ## GitHub Pages
 
@@ -77,6 +114,9 @@ To deploy:
 2. Push this project to the repository's `main` branch.
 3. Open **Settings → Pages** in GitHub.
 4. Under **Build and deployment**, select **GitHub Actions** as the source.
+5. Under **Settings → Secrets and variables → Actions → Variables**, add:
+   `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`,
+   `VITE_FIREBASE_PROJECT_ID`, and `VITE_FIREBASE_APP_ID`.
 
 Each push to `main` runs the checks, builds `dist`, and deploys it through the
 official GitHub Pages actions.
