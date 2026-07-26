@@ -930,7 +930,7 @@
   }
 
   .qr-intro {
-    margin-bottom: var(--space-6);
+    margin-bottom: var(--space-4);
   }
 
   .qr-intro .tool-breadcrumb {
@@ -952,6 +952,11 @@
 
   .qr-type-picker__quick .qr-type-button {
     min-height: 3.75rem;
+  }
+
+  .qr-panel--build .qr-panel__heading p:not(.eyebrow),
+  .qr-type-picker__summary > p:last-child {
+    display: none;
   }
 
   .qr-content-form,
