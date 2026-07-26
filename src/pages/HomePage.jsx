@@ -1,40 +1,49 @@
 import AppCard from '../components/AppCard.jsx'
+import NetworkSignal from '../components/NetworkSignal.jsx'
 import { appRegistry } from '../config/appRegistry.jsx'
 
 export default function HomePage() {
+  const availableCount = appRegistry.filter(
+    (app) => app.status === 'available',
+  ).length
+  const comingSoonCount = appRegistry.filter(
+    (app) => app.status === 'coming-soon',
+  ).length
+
   return (
     <div className="home-page">
-      <section className="home-hero">
+      <section className="home-hero" aria-labelledby="network-title">
         <div className="home-hero__copy">
-          <p className="eyebrow">Your utility shelf</p>
-          <h1>
-            Useful tools,
-            <span> ready when work starts.</span>
+          <p className="eyebrow">
+            ARVENILO NETWORK / PRODUCTIVITY SYSTEM
+          </p>
+          <h1 id="network-title">
+            Small tools.{' '}
+            <span>Connected work.</span>
           </h1>
           <p className="home-hero__intro">
-            A growing collection of focused apps for the repetitive parts of
-            your day.
+            A growing network of focused applications for the repetitive parts
+            of your day. Choose one task, finish it clearly, and keep moving.
           </p>
+          <div className="network-status" aria-label="Application availability">
+            <span>
+              <strong>{availableCount}</strong> available now
+            </span>
+            <span>
+              <strong>{comingSoonCount}</strong> coming soon
+            </span>
+          </div>
         </div>
-        <div className="tab-stack" aria-hidden="true">
-          <span className="tab-stack__tab tab-stack__tab--back">notes</span>
-          <span className="tab-stack__tab tab-stack__tab--middle">tasks</span>
-          <span className="tab-stack__tab tab-stack__tab--front">links</span>
-          <span className="tab-stack__surface">
-            <i />
-            <i />
-            <i />
-          </span>
-        </div>
+        <NetworkSignal />
       </section>
 
       <section className="app-library" aria-labelledby="app-library-title">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">App library</p>
-            <h2 id="app-library-title">Pick a tool</h2>
+            <p className="eyebrow">Application network</p>
+            <h2 id="app-library-title">Choose a focused utility</h2>
           </div>
-          <p>{appRegistry.length} available</p>
+          <p>{appRegistry.length} network nodes</p>
         </div>
         <div className="app-grid">
           {appRegistry.map((app, index) => (
