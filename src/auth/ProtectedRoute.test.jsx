@@ -6,10 +6,10 @@ import {
   useLocation,
 } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { useAuth } from './AuthContext.jsx'
+import { useAuth } from './authContext.js'
 import ProtectedRoute from './ProtectedRoute.jsx'
 
-vi.mock('./AuthContext.jsx', () => ({
+vi.mock('./authContext.js', () => ({
   useAuth: vi.fn(),
 }))
 

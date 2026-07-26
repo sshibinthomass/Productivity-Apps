@@ -1,17 +1,14 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
 } from 'react'
+import { AuthContext } from './authContext.js'
 import {
   firebaseClient,
   getAuthErrorMessage,
 } from './firebaseClient.js'
-
-const AuthContext = createContext(null)
 
 export function AuthProvider({ children, client = firebaseClient }) {
   const [user, setUser] = useState(null)
@@ -24,13 +21,8 @@ export function AuthProvider({ children, client = firebaseClient }) {
 
   useEffect(() => {
     if (client.configurationError) {
-      setUser(null)
-      setIsAuthLoading(false)
-      setAuthError(client.configurationError)
       return undefined
     }
-
-    setIsAuthLoading(true)
 
     return client.observeAuthState(
       (nextUser) => {
@@ -81,14 +73,4 @@ export function AuthProvider({ children, client = firebaseClient }) {
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext)
-
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider.')
-  }
-
-  return context
 }

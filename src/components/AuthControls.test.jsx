@@ -1,10 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { useAuth } from '../auth/AuthContext.jsx'
+import { useAuth } from '../auth/authContext.js'
 import AuthControls from './AuthControls.jsx'
 
-vi.mock('../auth/AuthContext.jsx', () => ({
+vi.mock('../auth/authContext.js', () => ({
   useAuth: vi.fn(),
 }))
 

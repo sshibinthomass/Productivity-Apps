@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth } from '../auth/AuthContext.jsx'
+import { useAuth } from '../auth/authContext.js'
 
 export default function AuthControls() {
   const { user, isAuthLoading, signOutUser } = useAuth()

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { useAuth } from '../auth/AuthContext.jsx'
+import { useAuth } from '../auth/authContext.js'
 import { getSafeReturnPath } from '../auth/returnPath.js'
 
 export default function LoginPage() {

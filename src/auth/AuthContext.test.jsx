@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { AuthProvider, useAuth } from './AuthContext.jsx'
+import { AuthProvider } from './AuthContext.jsx'
+import { useAuth } from './authContext.js'
 
 function createClient(overrides = {}) {
   let onUser
