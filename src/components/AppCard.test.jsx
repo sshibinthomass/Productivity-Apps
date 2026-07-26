@@ -26,7 +26,10 @@ describe('AppCard', () => {
   })
 
   it('describes coming-soon applications without presenting an action', () => {
-    const { container } = renderCard(appRegistry[1])
+    const comingSoonApp = appRegistry.find(
+      (app) => app.status === 'coming-soon',
+    )
+    const { container } = renderCard(comingSoonApp)
 
     expect(container.querySelector('article')).toBeTruthy()
     expect(screen.queryByRole('link')).toBeNull()

@@ -52,3 +52,34 @@ export function NotesIcon({ size = 24 }) {
     </IconFrame>
   )
 }
+
+export function JsonIcon({ size = 24 }) {
+  return (
+    <IconFrame size={size}>
+      <path
+        d="M9 4.5H7.75A1.75 1.75 0 0 0 6 6.25V9c0 1.15-.55 2-1.5 2.35v1.3C5.45 13 6 13.85 6 15v2.75a1.75 1.75 0 0 0 1.75 1.75H9M15 4.5h1.25A1.75 1.75 0 0 1 18 6.25V9c0 1.15.55 2 1.5 2.35v1.3C18.55 13 18 13.85 18 15v2.75a1.75 1.75 0 0 1-1.75 1.75H15"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <circle cx="9.5" cy="12" fill="currentColor" r="0.8" />
+      <circle cx="12" cy="12" fill="currentColor" r="0.8" />
+      <circle cx="14.5" cy="12" fill="currentColor" r="0.8" />
+    </IconFrame>
+  )
+}
+
+export function CompareIcon({ size = 24 }) {
+  return (
+    <IconFrame size={size}>
+      <path
+        d="M4.5 6h6M4.5 10h4M13.5 14h6M15.5 18h4M11 7.5l2-2 2 2M13 5.5v5M13 16.5l-2 2-2-2M11 18.5v-5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </IconFrame>
+  )
+}
