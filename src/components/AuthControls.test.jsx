@@ -70,6 +70,23 @@ describe('AuthControls', () => {
     expect(screen.getByRole('alert').textContent).toContain('not configured')
   })
 
+  it('lets the login card own authentication errors on the login route', () => {
+    useAuth.mockReturnValue({
+      user: null,
+      isAuthLoading: false,
+      authError: 'Firebase sign-in is not configured.',
+      signOutUser: vi.fn(),
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <AuthControls />
+      </MemoryRouter>,
+    )
+
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
   it('shows the signed-in identity and signs out from the header', async () => {
     const signOutUser = vi.fn().mockResolvedValue(true)
     useAuth.mockReturnValue({

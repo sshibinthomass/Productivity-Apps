@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/authContext.js'
 
 export default function AuthControls() {
   const { user, isAuthLoading, authError, signOutUser } = useAuth()
+  const location = useLocation()
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState(null)
-  const visibleError = authError || signOutError
+  const visibleError =
+    location.pathname === '/login' ? null : authError || signOutError
 
   if (isAuthLoading) {
     return (
