@@ -9,8 +9,22 @@ import { ApiError } from '../src/http/errors.js'
 const apiOrigin = 'https://api.shibinthomas.com'
 const appOrigin = 'https://app.shibinthomas.com'
 const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, ...new Uint8Array(13), 0, 0, 0, 0, 0, 0, 0, 0, 0x49, 0x45, 0x4e, 0x44, 0, 0, 0, 0])
-const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 2, 0xff, 0xd9])
+const jpeg = Uint8Array.from(atob('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDi6KKK+ZP3E//Z'), (char) => char.charCodeAt(0))
 const gif = new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 1, 0, 1, 0, 0, 0, 0, 0x3b])
+const realJpeg = Uint8Array.from(atob([
+  '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0a',
+  'HBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIy',
+  'MjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIA',
+  'AhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQA',
+  'AAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3',
+  'ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWm',
+  'p6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEA',
+  'AwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSEx',
+  'BhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElK',
+  'U1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3',
+  'uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDi6KKK',
+  '+ZP3E//Z',
+].join('')), (char) => char.charCodeAt(0))
 const webp = new Uint8Array([0x52, 0x49, 0x46, 0x46, 14, 0, 0, 0, 0x57, 0x45, 0x42, 0x50, 0x56, 0x50, 0x38, 0x20, 1, 0, 0, 0, 0, 0])
 
 function file(bytes = png, type = 'image/png') {
@@ -52,7 +66,7 @@ describe('R2 mini-site assets', () => {
   })
 
   it.each([
-    ['image/png', png], ['image/jpeg', jpeg], ['image/gif', gif], ['image/webp', webp],
+    ['image/png', png], ['image/jpeg', realJpeg], ['image/gif', gif], ['image/webp', webp],
   ])('accepts the %s signature only when it matches the declared MIME type', async (type, bytes) => {
     const uploaded = await assets.uploadDraft({ userId: 'owner-1', siteId: 'site-1', file: file(bytes, type) })
     expect(uploaded).toMatchObject({ assetId: expect.any(String), storagePath: `drafts/owner-1/site-1/${uploaded.assetId}`, url: `${apiOrigin}/v1/sites/site-1/assets/${uploaded.assetId}` })
@@ -64,7 +78,7 @@ describe('R2 mini-site assets', () => {
 
   it.each([
     ['PNG without IEND', 'image/png', png.slice(0, -12)],
-    ['JPEG with a truncated segment', 'image/jpeg', new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 8, 1])],
+    ['JPEG with a truncated scan', 'image/jpeg', realJpeg.slice(0, -2)],
     ['GIF without a trailer', 'image/gif', gif.slice(0, -1)],
     ['WebP with a false RIFF length', 'image/webp', new Uint8Array([...webp.slice(0, 4), 1, 0, 0, 0, ...webp.slice(8)])],
     ['a PNG polyglot with appended bytes', 'image/png', new Uint8Array([...png, 1])],
@@ -172,6 +186,22 @@ describe('R2 mini-site assets', () => {
     await expect(service.publishMiniSite({ userId: 'owner-1', data: { siteId: 'site-1' } })).resolves.toEqual({ slug: 'site-1-page', revision: 4 })
     expect((await env.MEDIA.list({ prefix: 'staging/site-1/4/' })).objects).toEqual([])
     await expect(env.MEDIA.get('public/site-1/4/asset-1')).resolves.toBeTruthy()
+  })
+
+  it.each(['staging-read', 'public-put'])('removes staging when %s fails after its put', async (failure) => {
+    const uploaded = await assets.uploadDraft({ userId: 'owner-1', siteId: 'site-1', file: file() })
+    const deleted = []
+    const bucket = {
+      head: (...args) => env.MEDIA.head(...args), list: (...args) => env.MEDIA.list(...args),
+      async get(key) { if (failure === 'staging-read' && key.startsWith('staging/')) throw new Error('staging unavailable'); return env.MEDIA.get(key) },
+      async put(key, ...args) { if (failure === 'public-put' && key.startsWith('public/')) throw new Error('public unavailable'); return env.MEDIA.put(key, ...args) },
+      async delete(key) { deleted.push(key); return env.MEDIA.delete(key) },
+    }
+    const failing = createAssetService({ bucket, db: env.DB, publicOrigin: 'https://links.shibinthomas.com' })
+    const draft = { siteId: 'site-1', draftRevision: 6, blocks: [{ id: 'image', type: 'image', visible: true, content: { storagePath: uploaded.storagePath, url: 'private' } }], seo: {} }
+    await expect(failing.promoteReferenced({ userId: 'owner-1', siteId: 'site-1', draft, attemptId: failure })).rejects.toThrow()
+    expect(deleted).toEqual([`staging/site-1/6/${failure}/asset-1`])
+    await expect(env.MEDIA.get(`staging/site-1/6/${failure}/asset-1`)).resolves.toBeNull()
   })
 
   it('does not promote hidden or unsupported stale references', async () => {

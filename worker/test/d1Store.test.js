@@ -116,6 +116,38 @@ describe('D1 mini-site store', () => {
     await expect(store.get({ userId: 'user-1', siteId: 'site-1' })).resolves.toBeNull()
   })
 
+  it('leaves every record intact when the name changes immediately before the atomic delete batch', async () => {
+    await create(store)
+    await env.DB.prepare('INSERT INTO site_assets (id, site_id, owner_id, object_key, content_type, size_bytes) VALUES (?, ?, ?, ?, ?, ?)').bind('asset-1', 'site-1', 'user-1', 'drafts/user-1/site-1/asset-1', 'image/png', 1).run()
+    const racingDb = {
+      prepare: (...args) => env.DB.prepare(...args),
+      async batch(statements) {
+        await env.DB.prepare('UPDATE mini_sites SET name = ? WHERE id = ?').bind('Renamed while deleting', 'site-1').run()
+        return env.DB.batch(statements)
+      },
+    }
+    const racingStore = createD1Store({ db: racingDb })
+    await expect(racingStore.delete({ userId: 'user-1', siteId: 'site-1', confirmationName: 'Maya Studio' })).resolves.toEqual({ code: 'name-mismatch' })
+    await expect(env.DB.prepare('SELECT name FROM mini_sites WHERE id = ?').bind('site-1').first()).resolves.toEqual({ name: 'Renamed while deleting' })
+    await expect(env.DB.prepare('SELECT object_key FROM site_assets WHERE id = ?').bind('asset-1').first()).resolves.toEqual({ object_key: 'drafts/user-1/site-1/asset-1' })
+  })
+
+  it('captures a just-before-batch asset in the deletion manifest and deletes its metadata atomically', async () => {
+    await create(store)
+    const concurrentDb = {
+      prepare: (...args) => env.DB.prepare(...args),
+      async batch(statements) {
+        await env.DB.prepare('INSERT INTO site_assets (id, site_id, owner_id, object_key, content_type, size_bytes) VALUES (?, ?, ?, ?, ?, ?)').bind('asset-race', 'site-1', 'user-1', 'drafts/user-1/site-1/asset-race', 'image/png', 1).run()
+        return env.DB.batch(statements)
+      },
+    }
+    const concurrentStore = createD1Store({ db: concurrentDb })
+    const result = await concurrentStore.delete({ userId: 'user-1', siteId: 'site-1', confirmationName: 'Maya Studio' })
+    expect(result).toEqual({ deleted: true })
+    expect(result.assetKeys).toEqual(['drafts/user-1/site-1/asset-race'])
+    await expect(env.DB.prepare('SELECT * FROM site_assets WHERE id = ?').bind('asset-race').first()).resolves.toBeNull()
+  })
+
   it('returns no more than thirty analytics days in ascending display order', async () => {
     await create(store)
     await env.DB.prepare('INSERT INTO analytics_summary (site_id, view_count, click_count) VALUES (?, ?, ?)').bind('site-1', 42, 7).run()

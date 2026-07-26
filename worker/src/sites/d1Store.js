@@ -177,21 +177,23 @@ export function createD1Store({ db } = {}) {
     },
 
     async delete({ userId, siteId, confirmationName }) {
-      const current = await get({ userId, siteId })
-      if (!current) return { code: 'not-found' }
-      if (current.name !== confirmationName) return { code: 'name-mismatch' }
-      const { results: assets } = await db.prepare('SELECT object_key FROM site_assets WHERE site_id = ?1 AND owner_id = ?2').bind(siteId, userId).all()
+      const guard = 'EXISTS (SELECT 1 FROM mini_sites WHERE id = ?1 AND owner_id = ?2 AND name = ?3)'
       const statements = [
-        db.prepare('DELETE FROM published_sites WHERE site_id = ?1').bind(siteId),
-        db.prepare('DELETE FROM site_assets WHERE site_id = ?1 AND owner_id = ?2').bind(siteId, userId),
-        db.prepare('DELETE FROM analytics_summary WHERE site_id = ?1').bind(siteId),
-        db.prepare('DELETE FROM analytics_days WHERE site_id = ?1').bind(siteId),
-        db.prepare('DELETE FROM analytics_events WHERE site_id = ?1').bind(siteId),
-        db.prepare('DELETE FROM mini_sites WHERE id = ?1 AND owner_id = ?2').bind(siteId, userId),
+        db.prepare(`SELECT object_key FROM site_assets WHERE site_id = ?1 AND owner_id = ?2 AND ${guard}`).bind(siteId, userId, confirmationName),
+        db.prepare(`DELETE FROM published_sites WHERE site_id = ?1 AND ${guard}`).bind(siteId, userId, confirmationName),
+        db.prepare(`DELETE FROM site_assets WHERE site_id = ?1 AND owner_id = ?2 AND ${guard}`).bind(siteId, userId, confirmationName),
+        db.prepare(`DELETE FROM analytics_summary WHERE site_id = ?1 AND ${guard}`).bind(siteId, userId, confirmationName),
+        db.prepare(`DELETE FROM analytics_days WHERE site_id = ?1 AND ${guard}`).bind(siteId, userId, confirmationName),
+        db.prepare(`DELETE FROM analytics_events WHERE site_id = ?1 AND ${guard}`).bind(siteId, userId, confirmationName),
+        db.prepare('DELETE FROM mini_sites WHERE id = ?1 AND owner_id = ?2 AND name = ?3').bind(siteId, userId, confirmationName),
       ]
-      await db.batch(statements)
+      const results = await db.batch(statements)
+      if (results.at(-1).meta.changes !== 1) {
+        const existing = await db.prepare('SELECT id FROM mini_sites WHERE id = ?1 AND owner_id = ?2').bind(siteId, userId).first()
+        return existing ? { code: 'name-mismatch' } : { code: 'not-found' }
+      }
       const result = { deleted: true }
-      Object.defineProperty(result, 'assetKeys', { value: assets.map(({ object_key: key }) => key) })
+      Object.defineProperty(result, 'assetKeys', { value: results[0].results.map(({ object_key: key }) => key) })
       return result
     },
 

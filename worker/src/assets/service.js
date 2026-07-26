@@ -29,16 +29,27 @@ function validPng(bytes) {
 
 function validJpeg(bytes) {
   if (!hasPrefix(bytes, [0xff, 0xd8])) return false
-  let offset = 2
+  let offset = 2; let sawFrame = false; let sawScan = false; let inScan = false
   while (offset < bytes.length) {
+    if (inScan) {
+      if (bytes[offset++] !== 0xff) continue
+      if (offset >= bytes.length) return false
+      const scanByte = bytes[offset]
+      if (scanByte === 0x00 || (scanByte >= 0xd0 && scanByte <= 0xd7)) { offset += 1; continue }
+      if (scanByte === 0xff) continue
+      if (scanByte === 0xd9) return sawFrame && sawScan && offset + 1 === bytes.length
+      inScan = false
+    }
     if (bytes[offset++] !== 0xff) return false
     while (bytes[offset] === 0xff) offset += 1
     const marker = bytes[offset++]
-    if (marker === 0xd9) return offset === bytes.length
+    if (marker === 0xd9) return sawFrame && sawScan && offset === bytes.length
     if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue
     if (offset + 2 > bytes.length) return false
     const length = (bytes[offset] << 8) + bytes[offset + 1]
     if (length < 2 || offset + length > bytes.length) return false
+    if ((marker >= 0xc0 && marker <= 0xc3) || (marker >= 0xc5 && marker <= 0xc7) || (marker >= 0xc9 && marker <= 0xcb) || (marker >= 0xcd && marker <= 0xcf)) sawFrame = true
+    if (marker === 0xda) { sawScan = true; inScan = true }
     offset += length
   }
   return false
@@ -156,9 +167,9 @@ export function createAssetService({ bucket, db, publicOrigin, createId = () => 
         const source = await bucket.get(asset.object_key)
         if (!source) throw assetError('The draft references an unavailable image.')
         await bucket.put(stagingKey, source.body, { httpMetadata: { contentType: asset.content_type, contentDisposition: contentDisposition(asset.id) } })
+        publicPaths.push(stagingKey)
         const staged = await bucket.get(stagingKey)
         await bucket.put(targetKey, staged.body, { httpMetadata: { contentType: asset.content_type, contentDisposition: contentDisposition(asset.id) } })
-        publicPaths.push(stagingKey)
       }
       const url = publicUrl(publicOrigin, siteId, revision, asset.id)
       promoted.set(path, url)
