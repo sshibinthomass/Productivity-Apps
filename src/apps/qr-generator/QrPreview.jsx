@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { createQrOptions } from './qrRenderConfig.js'
 
 export default function QrPreview({
@@ -12,7 +12,6 @@ export default function QrPreview({
 }) {
   const hostRef = useRef(null)
   const instanceRef = useRef(null)
-  const [snapshot, setSnapshot] = useState('')
 
   useEffect(() => {
     const host = hostRef.current
@@ -23,7 +22,6 @@ export default function QrPreview({
 
     if (!valid) {
       host.replaceChildren()
-      setSnapshot('')
       onReady(null)
       return
     }
@@ -42,11 +40,9 @@ export default function QrPreview({
       }
 
       onReady(instanceRef.current)
-      setSnapshot(host.innerHTML)
       onError('')
     } catch (error) {
       host.replaceChildren()
-      setSnapshot('')
       onReady(null)
       onError(
         error instanceof Error
@@ -60,7 +56,9 @@ export default function QrPreview({
     <>
       <div className="qr-code-stage">
         <div
-          className={`qr-code-host${valid ? ' qr-code-host--valid' : ''}`}
+          className={`qr-code-host${valid ? ' qr-code-host--valid' : ''}${
+            fullScreen ? ' qr-code-host--full' : ''
+          }`}
           aria-label={valid ? 'Generated QR code' : 'QR code preview'}
           ref={hostRef}
         />
@@ -71,13 +69,6 @@ export default function QrPreview({
           </div>
         )}
       </div>
-      {fullScreen && (
-        <div
-          aria-label="Enlarged generated QR code"
-          className="qr-code-host qr-code-host--full"
-          dangerouslySetInnerHTML={{ __html: snapshot }}
-        />
-      )}
     </>
   )
 }

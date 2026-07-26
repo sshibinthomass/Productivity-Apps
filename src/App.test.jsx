@@ -69,6 +69,15 @@ describe('App authentication routes', () => {
     ).toBeNull()
   })
 
+  it('keeps QR Generator public for a signed-out user', () => {
+    renderAt('/qr-generator')
+
+    expect(screen.getByLabelText('Website URL')).toBeTruthy()
+    expect(
+      screen.queryByRole('button', { name: 'Continue with Google' }),
+    ).toBeNull()
+  })
+
   it('applies the protected-route boundary to opted-in registry apps', () => {
     const PrivateFixture = () => <p>Private fixture app</p>
     const protectedRegistry = [

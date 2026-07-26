@@ -83,3 +83,14 @@ export function CompareIcon({ size = 24 }) {
     </IconFrame>
   )
 }
+
+export function QrIcon({ size = 24 }) {
+  return (
+    <IconFrame size={size}>
+      <path
+        d="M4 4h6v6H4V4Zm2 2v2h2V6H6Zm8-2h6v6h-6V4Zm2 2v2h2V6h-2ZM4 14h6v6H4v-6Zm2 2v2h2v-2H6Zm8-2h2v2h-2v-2Zm4 0h2v4h-2v-4Zm-4 4h4v2h-4v-2Z"
+        fill="currentColor"
+      />
+    </IconFrame>
+  )
+}

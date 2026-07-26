@@ -14,6 +14,7 @@ import {
   normalizeQrDesign,
 } from './qrRenderConfig.js'
 import { analyzeQrSafety } from './qrSafety.js'
+import './QrGeneratorPage.css'
 
 const defaultQrFactory = (options) => new QRCodeStyling(options)
 const defaultPrint = () => window.print()

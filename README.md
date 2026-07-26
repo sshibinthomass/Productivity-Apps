@@ -9,6 +9,9 @@ the shared account session through registry metadata.
 
 ## Application network
 
+- **QR Generator** — `AVAILABLE NOW` — create styled, scan-aware QR codes for
+  links, contacts, Wi-Fi, events, profiles, payments, and custom payloads.
+
 - **Multi Link Opener** — `AVAILABLE NOW` — paste one link per line and open every valid
   destination in a separate tab, either immediately or at a selected
   whole-second interval. The first link always loads immediately.
@@ -48,6 +51,7 @@ npm run build
 
 The development server uses:
 
+- QR Generator: `http://localhost:5173/qr-generator`
 - Home: `http://localhost:5173/`
 - Multi Link Opener: `http://localhost:5173/multi-link-opener`
 
@@ -107,6 +111,8 @@ credential to this browser application.
 
 Production routes are:
 
+- QR Generator:
+  `https://<username>.github.io/Productivity-Apps/qr-generator`
 - Home: `https://<username>.github.io/Productivity-Apps`
 - Multi Link Opener:
   `https://<username>.github.io/Productivity-Apps/multi-link-opener`
