@@ -122,8 +122,11 @@ export function createAssetService({ bucket, db, publicOrigin, createId = () => 
     const objectKey = `drafts/${userId}/${siteId}/${assetId}`
     await bucket.put(objectKey, body, { httpMetadata: { contentType, contentDisposition: contentDisposition(assetId) } })
     try {
-      await db.prepare(`INSERT INTO site_assets (id, site_id, owner_id, object_key, content_type, size_bytes)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6)`).bind(assetId, siteId, userId, objectKey, contentType, body.byteLength).run()
+      const metadata = await db.prepare(`INSERT INTO site_assets (id, site_id, owner_id, object_key, content_type, size_bytes)
+        SELECT ?1, ?2, ?3, ?4, ?5, ?6
+        WHERE EXISTS (SELECT 1 FROM mini_sites WHERE id = ?2 AND owner_id = ?3)`)
+        .bind(assetId, siteId, userId, objectKey, contentType, body.byteLength).run()
+      if (metadata.meta.changes !== 1) throw new ApiError('not_found', 'This mini-site could not be found.', 404)
     } catch (error) {
       await bucket.delete(objectKey)
       throw error

@@ -107,6 +107,30 @@ describe('R2 mini-site assets', () => {
     expect(calls).toEqual(['put:drafts/owner-1/site-1/asset-fail', 'insert', 'delete:drafts/owner-1/site-1/asset-fail'])
   })
 
+  it('compensates a draft object when a site is deleted while its R2 put is paused', async () => {
+    let releasePut; let putStarted
+    const putGate = new Promise((resolve) => { releasePut = resolve })
+    const started = new Promise((resolve) => { putStarted = resolve })
+    const bucket = {
+      get: (...args) => env.MEDIA.get(...args), head: (...args) => env.MEDIA.head(...args), list: (...args) => env.MEDIA.list(...args), delete: (...args) => env.MEDIA.delete(...args),
+      async put(key, ...args) { putStarted(); await putGate; return env.MEDIA.put(key, ...args) },
+    }
+    const racing = createAssetService({ bucket, db: env.DB, publicOrigin: 'https://links.shibinthomas.com', createId: () => 'asset-race' })
+    const upload = racing.uploadDraft({ userId: 'owner-1', siteId: 'site-1', file: file() })
+    await started
+    const { createD1Store } = await import('../src/sites/d1Store.js')
+    await expect(createD1Store({ db: env.DB }).delete({ userId: 'owner-1', siteId: 'site-1', confirmationName: 'Maya' })).resolves.toEqual({ deleted: true })
+    releasePut()
+    await expect(upload).rejects.toMatchObject({ code: 'not_found' })
+    await expect(env.MEDIA.get('drafts/owner-1/site-1/asset-race')).resolves.toBeNull()
+    await expect(env.DB.prepare('SELECT * FROM site_assets WHERE id = ?').bind('asset-race').first()).resolves.toBeNull()
+  })
+
+  it('accepts entropy-coded JPEG scans with stuffing and restart markers before EOI', async () => {
+    const entropyJpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xc0, 0, 2, 0xff, 0xda, 0, 2, 1, 0xff, 0, 2, 0xff, 0xd0, 3, 0xff, 0xd9])
+    await expect(assets.uploadDraft({ userId: 'owner-1', siteId: 'site-1', file: file(entropyJpeg, 'image/jpeg') })).resolves.toMatchObject({ assetId: 'asset-1' })
+  })
+
   it('does not return a draft object to another owner', async () => {
     const uploaded = await assets.uploadDraft({ userId: 'owner-1', siteId: 'site-1', file: file() })
     await expect(assets.getDraft({ userId: 'owner-2', siteId: 'site-1', assetId: uploaded.assetId })).rejects.toMatchObject({ code: 'not_found' })
