@@ -3,9 +3,9 @@ import { appRegistry, availableApps } from './appRegistry.jsx'
 
 describe('appRegistry', () => {
   it('models the available and announced Arvenilo Network applications', () => {
-    expect(appRegistry).toHaveLength(7)
+    expect(appRegistry).toHaveLength(8)
     expect(appRegistry.filter((app) => app.status === 'available')).toHaveLength(
-      4,
+      5,
     )
     expect(
       appRegistry.filter((app) => app.status === 'coming-soon'),
@@ -15,6 +15,7 @@ describe('appRegistry', () => {
       'JSON Formatter',
       'Text Comparison',
       'Mini-Site Builder',
+      'QR Generator',
       'Text Formatter',
       'Focus Timer',
       'Quick Notes',
@@ -77,8 +78,22 @@ describe('appRegistry', () => {
     expect(typeof appRegistry[3].icon).toBe('function')
   })
 
+  it('registers QR Generator as a public creation utility', () => {
+    expect(appRegistry[4]).toMatchObject({
+      id: 'qr-generator',
+      title: 'QR Generator',
+      path: '/qr-generator',
+      accent: 'mint',
+      category: 'Creation utility',
+      status: 'available',
+      requiresAuth: false,
+    })
+    expect(typeof appRegistry[4].component).toBe('function')
+    expect(typeof appRegistry[4].icon).toBe('function')
+  })
+
   it('exposes routes only for complete available applications', () => {
-    expect(availableApps).toHaveLength(4)
+    expect(availableApps).toHaveLength(5)
     expect(availableApps[0]).toMatchObject({
       title: 'Multi Link Opener',
       path: '/multi-link-opener',
@@ -103,6 +118,13 @@ describe('appRegistry', () => {
       status: 'available',
       requiresAuth: true,
     })
+    expect(typeof availableApps[3].component).toBe('function')
+    expect(availableApps[4]).toMatchObject({
+      title: 'QR Generator',
+      path: '/qr-generator',
+      status: 'available',
+    })
+    expect(typeof availableApps[4].component).toBe('function')
   })
 
   it('uses unique ids and paths', () => {

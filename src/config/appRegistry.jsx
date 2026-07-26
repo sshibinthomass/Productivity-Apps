@@ -1,5 +1,6 @@
 import MultiLinkOpenerPage from '../apps/multi-link-opener/MultiLinkOpenerPage.jsx'
 import JsonFormatterPage from '../apps/json-formatter/JsonFormatterPage.jsx'
+import QrGeneratorPage from '../apps/qr-generator/QrGeneratorPage.jsx'
 import TextComparisonPage from '../apps/text-comparison/TextComparisonPage.jsx'
 import MiniSitesDashboardPage from '../apps/mini-site-builder/MiniSitesDashboardPage.jsx'
 import { MiniSiteIcon } from '../apps/mini-site-builder/icons.jsx'
@@ -8,6 +9,7 @@ import {
   CompareIcon,
   JsonIcon,
   NotesIcon,
+  QrIcon,
   TextIcon,
   TimerIcon,
 } from '../components/icons/AppIcons.jsx'
@@ -64,6 +66,19 @@ export const appRegistry = [
     accent: 'mint',
     requiresAuth: true,
     component: MiniSitesDashboardPage,
+  },
+  {
+    id: 'qr-generator',
+    title: 'QR Generator',
+    description:
+      'Build scan-ready codes for links, contacts, Wi-Fi, events, payments, and more.',
+    category: 'Creation utility',
+    status: 'available',
+    path: '/qr-generator',
+    icon: QrIcon,
+    accent: 'mint',
+    requiresAuth: false,
+    component: QrGeneratorPage,
   },
   {
     id: 'text-formatter',

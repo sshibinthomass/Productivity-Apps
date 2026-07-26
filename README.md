@@ -8,6 +8,8 @@ built with the Precision Spatial design system.
 - **Mini-Site Builder** — `AVAILABLE NOW` — signed-in users can create up to
   five public profile/link pages from a template or a blank canvas, customize
   modular blocks, publish to a unique slug, and review private analytics.
+- **QR Generator** — `AVAILABLE NOW` — create styled, scan-aware QR codes for
+  links, contacts, Wi-Fi, events, profiles, payments, and custom payloads.
 - **Multi Link Opener** — `AVAILABLE NOW` — validate and open up to 100 links
   immediately or at a selected whole-second interval.
 - **JSON Formatter** — `AVAILABLE NOW`
@@ -57,6 +59,7 @@ values are public project identifiers.
 Local routes include:
 
 - Home: `http://localhost:5173/`
+- QR Generator: `http://localhost:5173/qr-generator`
 - Multi Link Opener: `http://localhost:5173/multi-link-opener`
 - Mini-Site dashboard: `http://localhost:5173/mini-sites`
 - Public mini-site: `http://localhost:5173/s/<slug>`
@@ -76,7 +79,8 @@ npm run build
 src/
 ├── apps/
 │   ├── mini-site-builder/
-│   └── multi-link-opener/
+│   ├── multi-link-opener/
+│   └── qr-generator/
 ├── auth/
 ├── components/
 ├── config/
@@ -159,6 +163,8 @@ App Check before deploying the web build.
 
 Production routes are:
 
+- QR Generator:
+  `https://<username>.github.io/Productivity-Apps/qr-generator`
 - Home: `https://<username>.github.io/Productivity-Apps`
 - Mini-Site dashboard:
   `https://<username>.github.io/Productivity-Apps/mini-sites`
