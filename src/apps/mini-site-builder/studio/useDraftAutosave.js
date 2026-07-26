@@ -48,12 +48,7 @@ export function useDraftAutosave({
           }
         })
       queueRef.current = request
-      try {
-        await request
-      } catch {
-        // The visible error state is set above. Keeping the queue rejected lets
-        // the next request explicitly recover through the catch at its head.
-      }
+      return request
     },
     [enabled, save],
   )
@@ -64,7 +59,7 @@ export function useDraftAutosave({
     }
 
     const timer = window.setTimeout(() => {
-      void performSave(draft)
+      void performSave(draft).catch(() => undefined)
     }, delay)
 
     return () => window.clearTimeout(timer)
@@ -78,8 +73,15 @@ export function useDraftAutosave({
   )
 
   const retry = useCallback(
-    () => performSave(draft),
+    () => performSave(draft).catch(() => undefined),
     [draft, performSave],
+  )
+  const flush = useCallback(
+    () =>
+      draft === savedDraft
+        ? Promise.resolve()
+        : performSave(draft),
+    [draft, performSave, savedDraft],
   )
 
   const markSavedRevision = useCallback((nextRevision, nextDraft) => {
@@ -99,6 +101,7 @@ export function useDraftAutosave({
     status,
     error: phase.error,
     retry,
+    flush,
     markSavedRevision,
     revision: savedRevision,
   }

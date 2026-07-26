@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AuthContext } from '../../../auth/authContext.js'
@@ -14,6 +20,24 @@ function buildDraft() {
       slug: 'maya-studio',
       templateId: 'creator',
     }),
+  }
+}
+
+function buildPublishableDraft() {
+  const draft = buildDraft()
+  return {
+    ...draft,
+    blocks: draft.blocks.map((block) =>
+      block.type === 'link'
+        ? {
+            ...block,
+            content: {
+              ...block.content,
+              url: 'https://example.com',
+            },
+          }
+        : block,
+    ),
   }
 }
 
@@ -149,5 +173,146 @@ describe('MiniSiteStudioPage', () => {
         'aria-selected',
       ),
     ).toBe('true')
+  })
+
+  it('customizes the safe theme controls and updates the preview', async () => {
+    renderStudio({})
+    await screen.findByText('Maya Studio')
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Design' }))
+    fireEvent.change(screen.getByLabelText('Page background'), {
+      target: { value: '#112233' },
+    })
+    fireEvent.change(screen.getByLabelText('Content width'), {
+      target: { value: 'wide' },
+    })
+    fireEvent.change(screen.getByLabelText('Button corners'), {
+      target: { value: '28' },
+    })
+
+    const preview = document.querySelector('.mini-site--preview')
+    expect(preview.style.getPropertyValue('--mini-bg')).toBe('#112233')
+    expect(preview.style.getPropertyValue('--mini-content-width')).toBe(
+      '52rem',
+    )
+    expect(preview.style.getPropertyValue('--mini-button-radius')).toBe(
+      '28px',
+    )
+  })
+
+  it('updates settings, changes the public slug, and publishes explicitly', async () => {
+    const repository = {
+      changeSlug: vi.fn().mockResolvedValue({ slug: 'maya-links' }),
+      publishSite: vi
+        .fn()
+        .mockResolvedValue({ slug: 'maya-links', revision: 0 }),
+      unpublishSite: vi.fn().mockResolvedValue({ slug: 'maya-links' }),
+    }
+    renderStudio(repository, buildPublishableDraft())
+    await screen.findByText('Maya Studio')
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Settings' }))
+    fireEvent.change(screen.getByLabelText('Site name'), {
+      target: { value: 'Maya Links' },
+    })
+    fireEvent.change(screen.getByLabelText('SEO description'), {
+      target: { value: 'Design notes and selected work.' },
+    })
+    fireEvent.change(screen.getByLabelText('Public slug'), {
+      target: { value: 'maya-links' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Change address' }))
+
+    await waitFor(() =>
+      expect(repository.changeSlug).toHaveBeenCalledWith({
+        siteId: 'site-1',
+        slug: 'maya-links',
+      }),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Publish site' }))
+    await waitFor(() =>
+      expect(repository.publishSite).toHaveBeenCalledWith('site-1'),
+    )
+    expect(screen.getByRole('link', { name: 'View public site' }).href).toContain(
+      '/s/maya-links',
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Unpublish site' }))
+    await waitFor(() =>
+      expect(repository.unpublishSite).toHaveBeenCalledWith('site-1'),
+    )
+  })
+
+  it('blocks publishing until visible content passes validation', async () => {
+    const repository = { publishSite: vi.fn() }
+    renderStudio(repository)
+    await screen.findByText('Maya Studio')
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Settings' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Publish site' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Add both a label and destination.',
+    )
+    expect(repository.publishSite).not.toHaveBeenCalled()
+  })
+
+  it('does not publish when the latest draft cannot be saved', async () => {
+    const repository = {
+      saveDraft: vi.fn().mockRejectedValue(new Error('Save interrupted')),
+      publishSite: vi.fn(),
+    }
+    renderStudio(repository, buildPublishableDraft())
+    await screen.findByText('Maya Studio')
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Settings' }))
+    fireEvent.change(screen.getByLabelText('SEO description'), {
+      target: { value: 'A newly changed description.' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Publish site' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Save interrupted',
+    )
+    expect(repository.publishSite).not.toHaveBeenCalled()
+  })
+
+  it('validates and uploads images into the selected block', async () => {
+    const repository = {
+      uploadDraftAsset: vi.fn().mockResolvedValue({
+        storagePath: 'mini-site-drafts/user-1/site-1/asset-1',
+        url: 'https://storage.example/avatar.png',
+      }),
+    }
+    renderStudio(repository)
+    await screen.findByText('Maya Studio')
+
+    fireEvent.click(screen.getByRole('button', { name: /Edit Your name/ }))
+    const invalidFile = new File(['text'], 'notes.txt', {
+      type: 'text/plain',
+    })
+    fireEvent.change(screen.getByLabelText('Upload avatar'), {
+      target: { files: [invalidFile] },
+    })
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Choose a JPEG, PNG, WebP, or GIF image.',
+    )
+
+    const image = new File(['image'], 'avatar.png', { type: 'image/png' })
+    fireEvent.change(screen.getByLabelText('Upload avatar'), {
+      target: { files: [image] },
+    })
+    await waitFor(() =>
+      expect(repository.uploadDraftAsset).toHaveBeenCalledWith(
+        expect.objectContaining({
+          uid: 'user-1',
+          siteId: 'site-1',
+          file: image,
+        }),
+      ),
+    )
+    expect(screen.getByLabelText('Avatar URL').value).toBe(
+      'https://storage.example/avatar.png',
+    )
   })
 })

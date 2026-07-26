@@ -31,7 +31,26 @@ function TextArea({ label, value = '', onChange }) {
   )
 }
 
-function BlockFields({ block, onContentChange }) {
+function UploadField({ label, busy, onUpload }) {
+  return (
+    <label className="mini-studio__upload">
+      <span>{busy ? 'Uploading…' : label}</span>
+      <input
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        disabled={busy}
+        onChange={(event) => onUpload(event.target.files?.[0])}
+      />
+    </label>
+  )
+}
+
+function BlockFields({
+  block,
+  onContentChange,
+  onUpload,
+  uploadBusy,
+}) {
   const update = (key) => (value) => onContentChange({ [key]: value })
   const content = block.content
 
@@ -39,6 +58,11 @@ function BlockFields({ block, onContentChange }) {
     case 'profile':
       return (
         <>
+          <UploadField
+            label="Upload avatar"
+            busy={uploadBusy}
+            onUpload={onUpload}
+          />
           <TextField
             label="Display name"
             value={content.displayName}
@@ -61,6 +85,11 @@ function BlockFields({ block, onContentChange }) {
     case 'link':
       return (
         <>
+          <UploadField
+            label="Upload image"
+            busy={uploadBusy}
+            onUpload={onUpload}
+          />
           <TextField
             label="Link label"
             value={content.label}
@@ -213,6 +242,8 @@ export default function ContentPanel({
   onToggleVisibility,
   onDuplicate,
   onDelete,
+  onUpload,
+  uploadState = {},
 }) {
   if (!block) {
     return (
@@ -241,7 +272,13 @@ export default function ContentPanel({
         </button>
       </header>
       <div className="mini-studio__fields">
-        <BlockFields block={block} onContentChange={onContentChange} />
+        <BlockFields
+          block={block}
+          onContentChange={onContentChange}
+          onUpload={onUpload}
+          uploadBusy={uploadState.status === 'uploading'}
+        />
+        {uploadState.error && <p role="alert">{uploadState.error}</p>}
       </div>
       <footer>
         <div>

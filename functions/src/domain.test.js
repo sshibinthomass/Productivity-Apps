@@ -4,6 +4,7 @@ import {
   parseCreateInput,
   parseEventInput,
   sanitizeSnapshot,
+  validatePublishableDraft,
 } from './domain.js'
 
 describe('function domain validation', () => {
@@ -149,5 +150,22 @@ describe('function domain validation', () => {
       },
     })
     expect(snapshot.ownerEmail).toBeUndefined()
+  })
+
+  it('rejects incomplete visible blocks before publishing', () => {
+    expect(() =>
+      validatePublishableDraft({
+        name: 'Maya Studio',
+        slug: 'maya-studio',
+        blocks: [
+          {
+            id: 'link-1',
+            type: 'link',
+            visible: true,
+            content: { label: 'Portfolio', url: '' },
+          },
+        ],
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'invalid-argument' }))
   })
 })

@@ -212,6 +212,32 @@ describe('mini-site lifecycle service', () => {
     ).toBe('https://storage.example/public/image-1.webp')
   })
 
+  it('does not publish incomplete drafts even when called directly', async () => {
+    const store = createMemoryStore()
+    store.sites.set(
+      'user-1/site-1',
+      makeDraft({
+        blocks: [
+          {
+            id: 'link-1',
+            type: 'link',
+            visible: true,
+            content: { label: '', url: '' },
+          },
+        ],
+      }),
+    )
+    const service = createMiniSiteService({ store })
+
+    await expect(
+      service.publishMiniSite({
+        auth: { uid: 'user-1' },
+        data: { siteId: 'site-1' },
+      }),
+    ).rejects.toMatchObject({ code: 'invalid-argument' })
+    expect(store.published.size).toBe(0)
+  })
+
   it('requires ownership and exact confirmation before deletion', async () => {
     const store = createMemoryStore()
     store.sites.set('user-1/site-1', makeDraft())

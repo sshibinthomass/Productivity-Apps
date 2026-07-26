@@ -660,6 +660,27 @@
   width: 100%;
 }
 
+.mini-studio__upload {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-signal-mint) 12%, var(--theme-surface));
+  border: 1px dashed color-mix(in srgb, var(--color-signal-mint) 70%, var(--theme-border));
+  border-radius: var(--radius-card);
+  cursor: pointer;
+  display: flex;
+  font-weight: 750;
+  justify-content: center;
+  min-height: 4.5rem;
+  padding: 1rem;
+  text-align: center;
+}
+
+.mini-studio__upload input {
+  height: 1px;
+  opacity: 0;
+  position: absolute;
+  width: 1px;
+}
+
 .mini-studio__check {
   align-items: center;
   display: flex;
@@ -761,6 +782,186 @@
   display: none;
 }
 
+.mini-studio__wide-panel {
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: clamp(1.5rem, 4vw, 3rem);
+}
+
+.mini-studio__wide-panel > header {
+  border-bottom: 1px solid var(--theme-border);
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+
+.mini-studio__wide-panel > header > span {
+  color: var(--theme-text-secondary);
+  font-family: var(--font-utility);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.mini-studio__wide-panel > header h2 {
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  letter-spacing: -0.045em;
+  margin: 0.3rem 0;
+}
+
+.mini-studio__wide-panel > header p {
+  color: var(--theme-text-secondary);
+  margin: 0;
+  max-width: 50ch;
+}
+
+.mini-studio__wide-panel fieldset {
+  border: 0;
+  border-bottom: 1px solid var(--theme-border);
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+  padding: 0 0 1.5rem;
+}
+
+.mini-studio__wide-panel fieldset + fieldset {
+  padding-top: 1.5rem;
+}
+
+.mini-studio__wide-panel legend {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 750;
+  margin-bottom: 1rem;
+}
+
+.mini-design__colors,
+.mini-design__grid {
+  display: grid !important;
+  gap: 0.8rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mini-design__color {
+  display: grid;
+  font-size: 0.76rem;
+  font-weight: 700;
+  gap: 0.45rem;
+}
+
+.mini-design__color > span:last-child {
+  align-items: center;
+  background: var(--theme-surface);
+  border: 1px solid var(--theme-border);
+  border-radius: var(--radius-control);
+  display: flex;
+  gap: 0.65rem;
+  padding: 0.45rem;
+}
+
+.mini-design__color input {
+  background: transparent;
+  border: 0;
+  height: 2rem;
+  padding: 0;
+  width: 2.5rem;
+}
+
+.mini-design__color code {
+  color: var(--theme-text-secondary);
+  font-size: 0.72rem;
+}
+
+.mini-settings fieldset {
+  grid-template-columns: 1fr;
+}
+
+.mini-settings__slug {
+  align-items: center;
+  background: var(--theme-form-surface);
+  border: 1px solid var(--theme-border);
+  border-radius: var(--radius-control);
+  display: flex;
+  overflow: hidden;
+  padding-left: 0.85rem;
+}
+
+.mini-settings__slug > span {
+  color: var(--theme-text-secondary);
+}
+
+.mini-settings__slug input {
+  border: 0;
+  flex: 1;
+}
+
+.mini-settings__slug button {
+  align-self: stretch;
+  background: var(--color-spatial-ink);
+  border: 0;
+  color: white;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0 1rem;
+}
+
+.mini-settings__slug button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.mini-settings__publish {
+  align-items: center;
+  background: var(--color-spatial-ink);
+  border-radius: var(--radius-stage);
+  color: #effcf9;
+  display: flex;
+  gap: 2rem;
+  justify-content: space-between;
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+}
+
+.mini-settings__publish h3 {
+  color: white;
+  font-size: 1.35rem;
+  margin: 0.35rem 0;
+}
+
+.mini-settings__publish p {
+  color: #a7bfbb;
+  margin: 0;
+  max-width: 45ch;
+}
+
+.mini-settings__publish > div:last-child {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  gap: 1rem;
+}
+
+.mini-settings__publish a {
+  color: white;
+}
+
+.mini-settings__status {
+  color: var(--color-signal-mint);
+  font-family: var(--font-utility);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.mini-settings__errors {
+  background: color-mix(in srgb, var(--theme-error) 9%, var(--theme-surface));
+  border-left: 3px solid var(--theme-error);
+  margin-top: 1rem;
+  padding: 0.8rem 1rem;
+}
+
+.mini-settings__errors p {
+  margin: 0.2rem 0;
+}
+
 .mini-studio__state {
   align-items: center;
   display: flex;
@@ -857,6 +1058,21 @@
 
   .mini-studio__editor {
     border-right: 0;
+  }
+
+  .mini-design__colors,
+  .mini-design__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mini-settings__slug,
+  .mini-settings__publish {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mini-settings__slug button {
+    min-height: 2.8rem;
   }
 
   .mini-studio__preview {

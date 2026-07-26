@@ -8,6 +8,7 @@ import {
   parseSiteId,
   parseSlug,
   sanitizeSnapshot,
+  validatePublishableDraft,
 } from './domain.js'
 
 function throwStoreError(result) {
@@ -87,12 +88,13 @@ export function createMiniSiteService({
       return throwStoreError(await store.changeSlug({ uid, siteId, slug }))
     },
 
-    async publishMiniSite(request) {
+      async publishMiniSite(request) {
       const uid = assertAuthenticated(request.auth)
       const siteId = parseSiteId(request.data?.siteId)
-      const draft = await store.get({ uid, siteId })
-      if (!draft) throwStoreError({ code: 'not-found' })
-      const publishableDraft = store.promoteAssets
+        const draft = await store.get({ uid, siteId })
+        if (!draft) throwStoreError({ code: 'not-found' })
+        validatePublishableDraft(draft)
+        const publishableDraft = store.promoteAssets
         ? await store.promoteAssets({ uid, siteId, draft })
         : draft
       return throwStoreError(

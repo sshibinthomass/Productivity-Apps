@@ -15,10 +15,17 @@ import {
   removeBlock,
   updateBlock,
 } from '../model/miniSiteModel.js'
+import {
+  validateForPublish,
+  validateImageFile,
+  validateSlug,
+} from '../model/validation.js'
 import { MiniSiteRenderer } from '../renderer/MiniSiteRenderer.jsx'
 import '../MiniSiteBuilder.css'
 import BlockList from './BlockList.jsx'
 import ContentPanel from './ContentPanel.jsx'
+import DesignPanel from './DesignPanel.jsx'
+import SettingsPanel from './SettingsPanel.jsx'
 import StudioHeader from './StudioHeader.jsx'
 import { useDraftAutosave } from './useDraftAutosave.js'
 
@@ -76,6 +83,17 @@ function StudioWorkspace({ initialDraft, repository, siteId, uid }) {
   const [section, setSection] = useState('Content')
   const [mobileView, setMobileView] = useState('Edit')
   const [addOpen, setAddOpen] = useState(false)
+  const [siteSlug, setSiteSlug] = useState(initialDraft.slug)
+  const [siteStatus, setSiteStatus] = useState(initialDraft.status)
+  const [uploadState, setUploadState] = useState({
+    status: 'idle',
+    error: null,
+  })
+  const [publishState, setPublishState] = useState({
+    busy: false,
+    errors: {},
+    actionError: null,
+  })
 
   const save = useCallback(
     (draft, expectedRevision) =>
@@ -139,6 +157,115 @@ function StudioWorkspace({ initialDraft, repository, siteId, uid }) {
     setSelectedId(
       nextBlocks[Math.min(selectedIndex, nextBlocks.length - 1)]?.id ?? null,
     )
+  }
+
+  const uploadImage = async (file) => {
+    const validation = validateImageFile(file)
+    if (!validation.valid) {
+      setUploadState({ status: 'error', error: validation.error })
+      return
+    }
+
+    setUploadState({ status: 'uploading', error: null })
+    try {
+      const assetId = globalThis.crypto?.randomUUID?.() ??
+        `asset-${Date.now()}`
+      const uploaded = await repository.uploadDraftAsset({
+        uid,
+        siteId,
+        assetId,
+        file,
+      })
+      const content =
+        selectedBlock.type === 'profile'
+          ? {
+              avatarUrl: uploaded.url,
+              avatarStoragePath: uploaded.storagePath,
+            }
+          : {
+              url: uploaded.url,
+              storagePath: uploaded.storagePath,
+            }
+      changeBlocks(updateBlock(blocks, selectedId, { content }))
+      setUploadState({ status: 'idle', error: null })
+    } catch (error) {
+      setUploadState({
+        status: 'error',
+        error: error?.message ?? 'The image could not be uploaded.',
+      })
+    }
+  }
+
+  const changeSlug = async (nextSlug) => {
+    const validation = validateSlug(nextSlug)
+    if (!validation.valid) {
+      setPublishState((state) => ({
+        ...state,
+        errors: { slug: validation.error },
+      }))
+      return
+    }
+
+    setPublishState({ busy: true, errors: {}, actionError: null })
+    try {
+      const result = await repository.changeSlug({
+        siteId,
+        slug: validation.value,
+      })
+      setSiteSlug(result.slug)
+      setPublishState({ busy: false, errors: {}, actionError: null })
+    } catch (error) {
+      setPublishState({
+        busy: false,
+        errors: {},
+        actionError:
+          error?.message ?? 'The public address could not be changed.',
+      })
+    }
+  }
+
+  const publish = async () => {
+    const validation = validateForPublish({
+      ...history.present,
+      slug: siteSlug,
+    })
+    if (!validation.valid) {
+      setPublishState({
+        busy: false,
+        errors: validation.errors,
+        actionError: null,
+      })
+      return
+    }
+
+    setPublishState({ busy: true, errors: {}, actionError: null })
+    try {
+      await autosave.flush()
+      await repository.publishSite(siteId)
+      setSiteStatus('published')
+      setPublishState({ busy: false, errors: {}, actionError: null })
+    } catch (error) {
+      setPublishState({
+        busy: false,
+        errors: {},
+        actionError: error?.message ?? 'The site could not be published.',
+      })
+    }
+  }
+
+  const unpublish = async () => {
+    setPublishState({ busy: true, errors: {}, actionError: null })
+    try {
+      await repository.unpublishSite(siteId)
+      setSiteStatus('draft')
+      setPublishState({ busy: false, errors: {}, actionError: null })
+    } catch (error) {
+      setPublishState({
+        busy: false,
+        errors: {},
+        actionError: error?.message ?? 'The site could not be unpublished.',
+      })
+    }
   }
 
   return (
@@ -220,8 +347,29 @@ function StudioWorkspace({ initialDraft, repository, siteId, uid }) {
                 }
                 onDuplicate={duplicateSelected}
                 onDelete={deleteSelected}
+                onUpload={uploadImage}
+                uploadState={uploadState}
               />
             </>
+          ) : section === 'Design' ? (
+            <DesignPanel
+              theme={history.present.theme}
+              onChange={(theme) => changeDraft({ theme })}
+            />
+          ) : section === 'Settings' ? (
+            <SettingsPanel
+              key={siteSlug}
+              draft={history.present}
+              slug={siteSlug}
+              status={siteStatus}
+              busy={publishState.busy}
+              errors={publishState.errors}
+              actionError={publishState.actionError}
+              onDraftChange={changeDraft}
+              onChangeSlug={changeSlug}
+              onPublish={publish}
+              onUnpublish={unpublish}
+            />
           ) : (
             <SectionPlaceholder section={section} />
           )}

@@ -15,7 +15,13 @@ const RESERVED_SLUGS = new Set([
 ])
 const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){1,38}[a-z0-9]$/
 const BLOCK_CONTENT_KEYS = {
-  profile: ['avatarUrl', 'displayName', 'bio', 'alt'],
+  profile: [
+    'avatarUrl',
+    'avatarStoragePath',
+    'displayName',
+    'bio',
+    'alt',
+  ],
   link: ['label', 'url', 'supportingText', 'icon'],
   heading: ['text', 'level'],
   paragraph: ['text'],
@@ -167,6 +173,9 @@ function sanitizeBlock(block) {
           .filter(({ url }) => url)
       : []
   }
+  if (block.type === 'profile') {
+    delete content.avatarStoragePath
+  }
 
   return {
     id: String(block.id),
@@ -188,6 +197,51 @@ function sanitizeTheme(value = {}) {
     button: { ...DEFAULT_THEME.button, ...(value.button ?? {}) },
     profile: { ...DEFAULT_THEME.profile, ...(value.profile ?? {}) },
   }
+}
+
+export function validatePublishableDraft(draft) {
+  if (!draft?.name?.trim()) {
+    throw functionError(
+      'invalid-argument',
+      'Add a site name before publishing.',
+    )
+  }
+  parseSlug(draft.slug)
+
+  const visibleBlocks = Array.isArray(draft.blocks)
+    ? draft.blocks.filter(({ visible }) => visible !== false)
+    : []
+  if (visibleBlocks.length === 0) {
+    throw functionError(
+      'invalid-argument',
+      'Add at least one visible block before publishing.',
+    )
+  }
+
+  for (const block of visibleBlocks) {
+    if (
+      block.type === 'link' &&
+      (!block.content?.label?.trim() || !sanitizeUrl(block.content?.url))
+    ) {
+      throw functionError(
+        'invalid-argument',
+        'Every visible link needs a label and valid destination.',
+      )
+    }
+    if (
+      block.type === 'image' &&
+      block.content?.url &&
+      !block.content?.decorative &&
+      !block.content?.alt?.trim()
+    ) {
+      throw functionError(
+        'invalid-argument',
+        'Every visible image needs alternative text or must be decorative.',
+      )
+    }
+  }
+
+  return draft
 }
 
 export function sanitizeSnapshot(draft) {
