@@ -64,6 +64,13 @@ describe('mini-site domain validation', () => {
     expect(draft.blocks[0].content.secret).toBeUndefined()
   })
 
+  it.each([
+    { name: 'Maya', templateId: 'blank', blocks: [null] },
+    { name: 'Maya', templateId: 'blank', blocks: [{ id: 'link-1', type: 'link', content: null }] },
+  ])('rejects malformed draft blocks with a stable validation error', (draft) => {
+    expect(() => parseDraftForSave(draft)).toThrowError(expect.objectContaining({ code: 'invalid_argument' }))
+  })
+
   it('accepts supported analytics events and rejects missing link targets', () => {
     expect(parseEventInput({ slug: 'maya-studio', type: 'link_click', blockId: 'block-1', eventId: 'event-12345678' })).toEqual({
       slug: 'maya-studio', type: 'link_click', blockId: 'block-1', eventId: 'event-12345678',
@@ -98,6 +105,13 @@ describe('mini-site domain validation', () => {
     for (const blocks of [
       [{ id: 'link-1', type: 'link', visible: true, content: { label: 'Portfolio', url: '' } }],
       [{ id: 'image-1', type: 'image', visible: true, content: { url: 'https://example.com/image.webp', decorative: false, alt: '' } }],
+    ]) expect(() => validatePublishableDraft({ name: 'Maya Studio', slug: 'maya-studio', blocks })).toThrowError(expect.objectContaining({ code: 'invalid_argument' }))
+  })
+
+  it('rejects malformed published blocks with a stable validation error', () => {
+    for (const blocks of [
+      [null],
+      [{ id: 'link-1', type: 'link', visible: true, content: null }],
     ]) expect(() => validatePublishableDraft({ name: 'Maya Studio', slug: 'maya-studio', blocks })).toThrowError(expect.objectContaining({ code: 'invalid_argument' }))
   })
 })

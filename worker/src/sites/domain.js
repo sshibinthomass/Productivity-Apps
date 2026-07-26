@@ -81,11 +81,11 @@ export function parseDraftForSave(value = {}) {
   const templateId = typeof value.templateId === 'string' ? value.templateId : ''
   const blocks = Array.isArray(value.blocks) ? value.blocks : []
   if (!SITE_TEMPLATES.has(templateId)) throw siteError('invalid-argument', 'Choose a supported template.')
-  if (blocks.length > 40 || blocks.filter(({ type }) => type === 'link').length > 25) throw siteError('invalid-argument', 'A mini-site may contain up to 40 blocks and 25 links.')
+  if (blocks.length > 40 || blocks.filter((block) => block?.type === 'link').length > 25) throw siteError('invalid-argument', 'A mini-site may contain up to 40 blocks and 25 links.')
   const normalizedBlocks = blocks.map((block) => {
     const keys = DRAFT_BLOCK_CONTENT_KEYS[block?.type]
     const id = typeof block?.id === 'string' ? block.id.trim() : ''
-    if (!keys || !id || id.length > 128 || typeof block.content !== 'object') throw siteError('invalid-argument', 'The draft contains an invalid block.')
+    if (!keys || !id || id.length > 128 || !block.content || typeof block.content !== 'object') throw siteError('invalid-argument', 'The draft contains an invalid block.')
     const content = Object.fromEntries(keys.filter((key) => block.content[key] !== undefined).map((key) => [key, structuredClone(block.content[key])]))
     if (block.type === 'socials') content.links = Array.isArray(content.links) ? content.links.slice(0, 12) : []
     return { id, type: block.type, visible: block.visible !== false, content }
@@ -120,9 +120,10 @@ function sanitizeBlock(block) {
 export function validatePublishableDraft(draft) {
   if (!draft?.name?.trim()) throw siteError('invalid-argument', 'Add a site name before publishing.')
   parseSlug(draft.slug)
-  const visibleBlocks = Array.isArray(draft.blocks) ? draft.blocks.filter(({ visible }) => visible !== false) : []
+  const visibleBlocks = Array.isArray(draft.blocks) ? draft.blocks.filter((block) => block?.visible !== false) : []
+  if (visibleBlocks.some((block) => !block || typeof block !== 'object')) throw siteError('invalid-argument', 'The draft contains an invalid block.')
   if (!visibleBlocks.length) throw siteError('invalid-argument', 'Add at least one visible block before publishing.')
-  if (visibleBlocks.length > 40 || visibleBlocks.filter(({ type }) => type === 'link').length > 25) throw siteError('invalid-argument', 'A mini-site may contain up to 40 blocks and 25 links.')
+  if (visibleBlocks.length > 40 || visibleBlocks.filter((block) => block.type === 'link').length > 25) throw siteError('invalid-argument', 'A mini-site may contain up to 40 blocks and 25 links.')
   for (const block of visibleBlocks) {
     if (block.type === 'link' && (!block.content?.label?.trim() || !sanitizeUrl(block.content?.url))) throw siteError('invalid-argument', 'Every visible link needs a label and valid destination.')
     if (block.type === 'image' && block.content?.url && !block.content?.decorative && !block.content?.alt?.trim()) throw siteError('invalid-argument', 'Every visible image needs alternative text or must be decorative.')
