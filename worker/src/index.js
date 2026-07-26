@@ -10,6 +10,8 @@ import { createD1Store } from './sites/d1Store.js'
 import { createMiniSiteService } from './sites/service.js'
 import { createSiteRoutes, requiresJsonSiteBody, requiresMultipartAssetUpload } from './sites/routes.js'
 import { createAssetService } from './assets/service.js'
+import { createAnalyticsService } from './analytics/service.js'
+import { createPublicRoutes } from './public/routes.js'
 
 const consentVersion = '2026-07-26'
 const protectedAuthRoutes = new Map([
@@ -211,7 +213,7 @@ export function createWorker(dependencies = {}) {
   return {
     async fetch(request, runtimeEnv) {
       const { hostname, pathname } = new URL(request.url)
-      if (hostname !== 'api.shibinthomas.com') {
+      if (!['api.shibinthomas.com', 'links.shibinthomas.com'].includes(hostname)) {
         return Response.json(
           { error: { code: 'not_found', message: 'Not found.' } },
           { status: 404 },
@@ -230,6 +232,15 @@ export function createWorker(dependencies = {}) {
       }
 
       try {
+        if (hostname === 'links.shibinthomas.com') {
+          const assets = createAssetService({ bucket: env.MEDIA, db: env.DB, publicOrigin: env.PUBLIC_SITE_ORIGIN })
+          const analytics = createAnalyticsService({ db: env.DB })
+          const routes = createPublicRoutes({
+            db: env.DB, assets, analytics, staticAssets: env.ASSETS, origin: env.PUBLIC_SITE_ORIGIN,
+          })
+          return await routes.handle(request)
+        }
+
         if (request.method === 'OPTIONS') {
           return withCors(request, new Response(null, { status: 204 }), env)
         }
@@ -288,6 +299,14 @@ export function createWorker(dependencies = {}) {
       } catch (error) {
         return withCors(request, errorResponse(error), env)
       }
+    },
+
+    async scheduled(_event, runtimeEnv, context) {
+      const env = validateEnv(runtimeEnv)
+      const assets = createAssetService({ bucket: env.MEDIA, db: env.DB, publicOrigin: env.PUBLIC_SITE_ORIGIN })
+      const cleanup = createAnalyticsService({ db: env.DB }).cleanup({ assets })
+      if (context?.waitUntil) context.waitUntil(cleanup)
+      else await cleanup
     },
   }
 }

@@ -220,5 +220,41 @@ export function createAssetService({ bucket, db, publicOrigin, createId = () => 
     await Promise.all([...assetKeys, ...publicKeys].map((key) => bucket.delete(key)))
   }
 
-  return { uploadDraft, getDraft, getPublic, promoteReferenced, deleteSiteAssets, cleanupObsolete }
+  async function cleanupObsoletePublicAssets({ now = new Date(), graceMilliseconds = 7 * 24 * 60 * 60 * 1000 } = {}) {
+    const cutoff = new Date(now.getTime() - graceMilliseconds)
+    const { results: published } = await db.prepare('SELECT snapshot_json FROM published_sites').all()
+    const referenced = new Set()
+    for (const { snapshot_json: snapshotJson } of published) {
+      let snapshot
+      try { snapshot = JSON.parse(snapshotJson) } catch { continue }
+      const values = [snapshot?.seo?.socialImageUrl]
+      for (const block of snapshot?.blocks ?? []) {
+        values.push(block?.content?.url, block?.content?.avatarUrl)
+      }
+      for (const value of values) {
+        if (typeof value !== 'string') continue
+        try {
+          const url = new URL(value)
+          if (url.origin !== publicOrigin) continue
+          const key = url.pathname.replace(/^\//, '')
+          if (key.startsWith('assets/')) referenced.add(`public/${key.slice('assets/'.length)}`)
+        } catch { /* malformed snapshot URLs are not references */ }
+      }
+    }
+    const stale = []
+    for (const prefix of ['public/', 'staging/']) {
+      let cursor
+      do {
+        const page = await bucket.list({ prefix, ...(cursor ? { cursor } : {}) })
+        for (const object of page.objects) {
+          if (!(object.uploaded instanceof Date) || object.uploaded >= cutoff) continue
+          if (prefix === 'staging/' || !referenced.has(object.key)) stale.push(object.key)
+        }
+        cursor = page.truncated ? page.cursor : undefined
+      } while (cursor)
+    }
+    await Promise.all(stale.map((key) => bucket.delete(key)))
+  }
+
+  return { uploadDraft, getDraft, getPublic, promoteReferenced, deleteSiteAssets, cleanupObsolete, cleanupObsoletePublicAssets }
 }

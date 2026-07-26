@@ -253,4 +253,19 @@ describe('R2 mini-site assets', () => {
     expect(cursors).toEqual([null, 'next'])
     expect(deleted.sort()).toEqual(['drafts/owner-1/site-1/a', 'public/site-1/1/a', 'public/site-1/2/a'])
   })
+
+  it('removes aged staging objects and unreferenced old public revisions during scheduled cleanup', async () => {
+    await env.MEDIA.put('public/site-1/1/old', png)
+    await env.MEDIA.put('public/site-1/2/current', png)
+    await env.MEDIA.put('staging/site-1/2/old-attempt/image', png)
+    await env.DB.prepare(`INSERT INTO published_sites (slug, site_id, snapshot_json, title, description, revision, published_at)
+      VALUES ('asset-cleanup', 'site-1', ?1, 'Maya', '', 2, '2026-07-01T00:00:00.000Z')`)
+      .bind(JSON.stringify({ schemaVersion: 1, slug: 'asset-cleanup', revision: 2, blocks: [{ id: 'image', type: 'image', visible: true, content: { url: 'https://links.shibinthomas.com/assets/site-1/2/current' } }], theme: {}, seo: {} })).run()
+
+    await assets.cleanupObsoletePublicAssets({ now: new Date('2026-08-15T00:00:00.000Z'), graceMilliseconds: 0 })
+
+    await expect(env.MEDIA.get('public/site-1/1/old')).resolves.toBeNull()
+    await expect(env.MEDIA.get('public/site-1/2/current')).resolves.toBeTruthy()
+    await expect(env.MEDIA.get('staging/site-1/2/old-attempt/image')).resolves.toBeNull()
+  })
 })
