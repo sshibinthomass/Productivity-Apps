@@ -68,6 +68,37 @@ describe('public mini-site routes', () => {
     expect(missing.headers.get('Cache-Control')).toBe('no-store')
   })
 
+  it('rebuilds public data from the public schema and adds browser hardening headers', async () => {
+    await seedPublishedSite(env.DB, { blocks: [{
+      id: 'link', type: 'link', visible: true,
+      content: { label: 'Read', url: 'https://example.com', icon: { private: 'nope' }, private: { nested: 'nope' } },
+    }] })
+    await env.DB.prepare('UPDATE published_sites SET snapshot_json = ?1 WHERE slug = ?2').bind(JSON.stringify({
+      schemaVersion: 9, slug: 'maya-links', revision: 3,
+      blocks: [{ id: 'link', type: 'link', visible: true, content: { label: 'Read', url: 'https://example.com', icon: { private: 'nope' }, private: { nested: 'nope' } } }],
+      theme: { colors: { text: '#111111', private: { nested: true } }, private: { nested: true } },
+      seo: { title: 'Maya', description: 'Studio', private: { nested: true } }, private: { nested: true },
+    }), 'maya-links').run()
+
+    const response = await worker.fetch(new Request(`${publicOrigin}/v1/public/sites/maya-links`), env, createExecutionContext())
+    const { site } = await response.json()
+
+    expect(site.theme).toEqual({ colors: { text: '#111111', muted: '', button: '', buttonText: '', buttonBorder: '' }, background: { type: '', value: '', secondary: '', imageUrl: '' }, fonts: { display: '', body: '' }, layout: { alignment: '', width: '', density: '' }, button: { style: '', radius: 0, shadow: '' }, profile: { shape: '', size: '' } })
+    expect(JSON.stringify(site)).not.toContain('private')
+    expect(site.blocks[0].content.icon).toBe('')
+    expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff')
+    expect(response.headers.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin')
+    expect(response.headers.get('Content-Security-Policy')).toContain("default-src 'self'")
+  })
+
+  it('does not accept malformed escapes or encoded separators in public asset paths', async () => {
+    for (const path of ['/assets/site%2Fother/3/avatar', '/assets/%E0%A4%A/3/avatar', '/v1/public/sites/%E0%A4%A']) {
+      const response = await worker.fetch(new Request(`${publicOrigin}${path}`), env, createExecutionContext())
+      expect([400, 404]).toContain(response.status)
+      expect(response.headers.get('Cache-Control')).toBe('no-store')
+    }
+  })
+
   it('uses static asset fallback outside public R2 asset paths', async () => {
     const response = await worker.fetch(new Request(`${publicOrigin}/assets/not-a-public-r2-object.js`), env, createExecutionContext())
 

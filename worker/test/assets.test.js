@@ -263,9 +263,38 @@ describe('R2 mini-site assets', () => {
       .bind(JSON.stringify({ schemaVersion: 1, slug: 'asset-cleanup', revision: 2, blocks: [{ id: 'image', type: 'image', visible: true, content: { url: 'https://links.shibinthomas.com/assets/site-1/2/current' } }], theme: {}, seo: {} })).run()
 
     await assets.cleanupObsoletePublicAssets({ now: new Date('2026-08-15T00:00:00.000Z'), graceMilliseconds: 0 })
+    await assets.cleanupObsoletePublicAssets({ now: new Date('2026-08-15T00:00:00.000Z'), graceMilliseconds: 0 })
 
     await expect(env.MEDIA.get('public/site-1/1/old')).resolves.toBeNull()
     await expect(env.MEDIA.get('public/site-1/2/current')).resolves.toBeTruthy()
     await expect(env.MEDIA.get('staging/site-1/2/old-attempt/image')).resolves.toBeNull()
+  })
+
+  it('bounds cleanup work and continues from its persisted cursor without deleting a newly current revision', async () => {
+    for (let number = 0; number < 30; number += 1) await env.MEDIA.put(`staging/site-1/2/attempt/${number}`, png)
+    await env.MEDIA.put('public/site-1/4/reused', png)
+
+    await assets.cleanupObsoletePublicAssets({ now: new Date('2026-08-15T00:00:00.000Z'), graceMilliseconds: 0, pageSize: 25, deleteBudget: 25 })
+    await assets.cleanupObsoletePublicAssets({ now: new Date('2026-08-15T00:00:00.000Z'), graceMilliseconds: 0, pageSize: 25, deleteBudget: 25 })
+    expect((await env.MEDIA.list({ prefix: 'staging/' })).objects).toHaveLength(5)
+    await expect(env.DB.prepare("SELECT phase, cursor FROM maintenance_cursors WHERE name = 'public_asset_cleanup'").first()).resolves.toMatchObject({ phase: 'staging', cursor: expect.any(String) })
+    await env.DB.prepare(`INSERT INTO published_sites (slug, site_id, snapshot_json, title, description, revision, published_at)
+      VALUES ('reused', 'site-1', ?1, '', '', 4, '2026-08-15T00:00:00.000Z')`).bind(JSON.stringify({ schemaVersion: 1, slug: 'reused', revision: 4, blocks: [{ id: 'image', type: 'image', visible: true, content: { url: 'https://links.shibinthomas.com/assets/site-1/4/reused' } }], theme: {}, seo: {} })).run()
+    await assets.cleanupObsoletePublicAssets({ now: new Date('2026-08-15T00:00:00.000Z'), graceMilliseconds: 0, pageSize: 25, deleteBudget: 25 })
+    await expect(env.MEDIA.get('public/site-1/4/reused')).resolves.toBeTruthy()
+    expect((await env.MEDIA.list({ prefix: 'staging/' })).objects).toEqual([])
+  })
+
+  it('rechecks the current published revision immediately before a selected public deletion', async () => {
+    await env.MEDIA.put('public/site-1/4/race', png)
+    await env.DB.prepare(`INSERT INTO published_sites (slug, site_id, snapshot_json, title, description, revision, published_at)
+      VALUES ('race', 'site-1', ?1, '', '', 5, '2026-08-15T00:00:00.000Z')`).bind(JSON.stringify({ schemaVersion: 1, slug: 'race', revision: 5, blocks: [], theme: {}, seo: {} })).run()
+    const racing = createAssetService({ bucket: env.MEDIA, db: env.DB, publicOrigin: 'https://links.shibinthomas.com', beforePublicDelete: async () => {
+      await env.DB.prepare("UPDATE published_sites SET revision = 4 WHERE slug = 'race'").run()
+    } })
+
+    await racing.cleanupObsoletePublicAssets({ now: new Date('2026-08-15T00:00:00.000Z'), graceMilliseconds: 0 })
+
+    await expect(env.MEDIA.get('public/site-1/4/race')).resolves.toBeTruthy()
   })
 })

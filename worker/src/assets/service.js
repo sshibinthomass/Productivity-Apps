@@ -95,7 +95,7 @@ function contentDisposition(assetId) {
   return `inline; filename="${assetId}"`
 }
 
-export function createAssetService({ bucket, db, publicOrigin, createId = () => crypto.randomUUID() } = {}) {
+export function createAssetService({ bucket, db, publicOrigin, createId = () => crypto.randomUUID(), beforePublicDelete } = {}) {
   if (!bucket) throw new TypeError('An R2 bucket is required.')
   if (!db) throw new TypeError('A D1 database is required.')
   if (!publicOrigin) throw new TypeError('A public asset origin is required.')
@@ -220,40 +220,36 @@ export function createAssetService({ bucket, db, publicOrigin, createId = () => 
     await Promise.all([...assetKeys, ...publicKeys].map((key) => bucket.delete(key)))
   }
 
-  async function cleanupObsoletePublicAssets({ now = new Date(), graceMilliseconds = 7 * 24 * 60 * 60 * 1000 } = {}) {
+  async function cleanupObsoletePublicAssets({ now = new Date(), graceMilliseconds = 7 * 24 * 60 * 60 * 1000, pageSize = 25, deleteBudget = 25 } = {}) {
     const cutoff = new Date(now.getTime() - graceMilliseconds)
-    const { results: published } = await db.prepare('SELECT snapshot_json FROM published_sites').all()
-    const referenced = new Set()
-    for (const { snapshot_json: snapshotJson } of published) {
-      let snapshot
-      try { snapshot = JSON.parse(snapshotJson) } catch { continue }
-      const values = [snapshot?.seo?.socialImageUrl]
-      for (const block of snapshot?.blocks ?? []) {
-        values.push(block?.content?.url, block?.content?.avatarUrl)
+    const state = await db.prepare("SELECT phase, cursor FROM maintenance_cursors WHERE name = 'public_asset_cleanup'").first() ?? { phase: 'public', cursor: null }
+    const prefix = state.phase === 'staging' ? 'staging/' : 'public/'
+    const page = await bucket.list({ prefix, ...(state.cursor ? { cursor: state.cursor } : {}), limit: Math.min(pageSize, deleteBudget) })
+    let deleted = 0
+    for (const object of page.objects) {
+      if (deleted >= deleteBudget || !(object.uploaded instanceof Date) || object.uploaded >= cutoff) continue
+      let eligible = prefix === 'staging/'
+      if (!eligible) {
+        await beforePublicDelete?.(object.key)
+        eligible = await obsoletePublicRevision(object.key)
       }
-      for (const value of values) {
-        if (typeof value !== 'string') continue
-        try {
-          const url = new URL(value)
-          if (url.origin !== publicOrigin) continue
-          const key = url.pathname.replace(/^\//, '')
-          if (key.startsWith('assets/')) referenced.add(`public/${key.slice('assets/'.length)}`)
-        } catch { /* malformed snapshot URLs are not references */ }
+      if (eligible) {
+        await bucket.delete(object.key)
+        deleted += 1
       }
     }
-    const stale = []
-    for (const prefix of ['public/', 'staging/']) {
-      let cursor
-      do {
-        const page = await bucket.list({ prefix, ...(cursor ? { cursor } : {}) })
-        for (const object of page.objects) {
-          if (!(object.uploaded instanceof Date) || object.uploaded >= cutoff) continue
-          if (prefix === 'staging/' || !referenced.has(object.key)) stale.push(object.key)
-        }
-        cursor = page.truncated ? page.cursor : undefined
-      } while (cursor)
-    }
-    await Promise.all(stale.map((key) => bucket.delete(key)))
+    const next = page.truncated ? { phase: state.phase, cursor: page.cursor } : state.phase === 'public' ? { phase: 'staging', cursor: null } : null
+    if (next) await db.prepare(`INSERT INTO maintenance_cursors (name, phase, cursor, updated_at) VALUES ('public_asset_cleanup', ?1, ?2, ?3)
+      ON CONFLICT(name) DO UPDATE SET phase = excluded.phase, cursor = excluded.cursor, updated_at = excluded.updated_at`).bind(next.phase, next.cursor, now.toISOString()).run()
+    else await db.prepare("DELETE FROM maintenance_cursors WHERE name = 'public_asset_cleanup'").run()
+  }
+
+  async function obsoletePublicRevision(key) {
+    const match = /^public\/([^/]+)\/(\d+)\/[^/]+$/.exec(key)
+    if (!match) return false
+    const published = await db.prepare('SELECT revision FROM published_sites WHERE site_id = ?1 LIMIT 1').bind(match[1]).first()
+    // A missing publication may be in-flight. Only an already newer revision proves this key obsolete.
+    return Boolean(published && Number(match[2]) < published.revision)
   }
 
   return { uploadDraft, getDraft, getPublic, promoteReferenced, deleteSiteAssets, cleanupObsolete, cleanupObsoletePublicAssets }

@@ -1,6 +1,7 @@
 import { createExecutionContext, env } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createWorker } from '../src/index.js'
+import { createAnalyticsService } from '../src/analytics/service.js'
 import { resetDatabase } from './support/database.js'
 
 const origin = 'https://links.shibinthomas.com'
@@ -67,6 +68,41 @@ describe('public mini-site analytics', () => {
     expect(bodies.filter(({ recorded }) => recorded)).toHaveLength(1)
     expect(bodies.filter(({ duplicate }) => duplicate)).toHaveLength(3)
     await expect(env.DB.prepare('SELECT view_count, click_count FROM analytics_summary WHERE site_id = ?').bind('site-1').first()).resolves.toEqual({ view_count: 1, click_count: 0 })
+  })
+
+  it('rejects view block IDs, caps oversized bodies before JSON parsing, and rate limits a client before event writes', async () => {
+    const viewWithBlock = await worker.fetch(event('maya-links', { type: 'view', blockId: 'portfolio', eventId: 'view-id-0003' }), env, createExecutionContext())
+    expect(viewWithBlock.status).toBe(400)
+    const huge = new Request(`${origin}/v1/public/sites/maya-links/events`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: `{${'x'.repeat(70 * 1024)}}` })
+    const tooLarge = await worker.fetch(huge, env, createExecutionContext())
+    expect(tooLarge.status).toBe(413)
+    for (let number = 0; number < 30; number += 1) {
+      expect((await worker.fetch(event('maya-links', { type: 'view', eventId: `rate-limit-${number}` }), env, createExecutionContext())).status).toBe(200)
+    }
+    const limited = await worker.fetch(event('maya-links', { type: 'view', eventId: 'rate-limit-overflow' }), env, createExecutionContext())
+    expect(limited.status).toBe(429)
+    await expect(limited.json()).resolves.toMatchObject({ error: { code: 'rate_limited' } })
+  })
+
+  it('gates a validated event on the same published site revision at commit time', async () => {
+    let release; let validated
+    const blocked = new Promise((resolve) => { release = resolve })
+    const reached = new Promise((resolve) => { validated = resolve })
+    const analytics = createAnalyticsService({ db: env.DB, beforePersist: async () => { validated(); await blocked } })
+    const recording = analytics.record({ slug: 'maya-links', data: { type: 'view', eventId: 'race-event-0001' }, network: '203.0.113.1' })
+    await reached
+    await env.DB.prepare('DELETE FROM published_sites WHERE slug = ?').bind('maya-links').run()
+    release()
+    await expect(recording).resolves.toEqual({ recorded: false, duplicate: false })
+    await expect(env.DB.prepare('SELECT COUNT(*) AS count FROM analytics_summary').first()).resolves.toEqual({ count: 0 })
+  })
+
+  it('uses canonical receipt tuples that keep adversarial delimiter event IDs distinct', async () => {
+    const one = await worker.fetch(event('maya-links', { type: 'link_click', blockId: 'portfolio', eventId: 'same:link_click:portfolio' }), env, createExecutionContext())
+    const two = await worker.fetch(event('maya-links', { type: 'link_click', blockId: 'socials', eventId: 'same:link_click:portfolio' }), env, createExecutionContext())
+    expect(await one.json()).toMatchObject({ recorded: true })
+    expect(await two.json()).toMatchObject({ recorded: true })
+    await expect(env.DB.prepare('SELECT COUNT(*) AS count FROM analytics_events').first()).resolves.toEqual({ count: 2 })
   })
 
   it('scheduled cleanup deletes expired receipts and expired authentication rate limits', async () => {

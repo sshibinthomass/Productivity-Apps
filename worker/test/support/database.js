@@ -4,6 +4,8 @@ const tables = [
   'analytics_events',
   'analytics_days',
   'analytics_summary',
+  'public_event_rate_limits',
+  'maintenance_cursors',
   'site_assets',
   'published_sites',
   'mini_sites',
