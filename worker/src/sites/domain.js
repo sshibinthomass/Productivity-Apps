@@ -21,8 +21,21 @@ export function siteError(code, message, status = 400) {
 }
 
 export function requireUserId(userId) {
-  if (!userId) throw siteError('unauthenticated', 'Sign in to manage mini-sites.', 401)
+  if (typeof userId !== 'string' || !userId.trim()) throw siteError('unauthenticated', 'Sign in to manage mini-sites.', 401)
   return userId
+}
+
+function isRecord(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function requireRecord(value, message = 'The draft contains invalid data.') {
+  if (!isRecord(value)) throw siteError('invalid-argument', message)
+  return value
+}
+
+function optionalRecord(value, message) {
+  return value === undefined ? {} : requireRecord(value, message)
 }
 
 function profileBlock(displayName, bio) {
@@ -58,6 +71,7 @@ function parseName(value) {
 }
 
 export function parseCreateInput(value = {}) {
+  value = requireRecord(value, 'Choose a supported template.')
   const templateId = typeof value.templateId === 'string' ? value.templateId : ''
   if (!SITE_TEMPLATES.has(templateId)) throw siteError('invalid-argument', 'Choose a supported template.')
   return { name: parseName(value.name), slug: parseSlug(value.slug), templateId }
@@ -70,30 +84,45 @@ export function parseSiteId(value) {
 }
 
 function sanitizeTheme(value = {}) {
+  const theme = requireRecord(value, 'The draft contains an invalid theme.')
+  const background = optionalRecord(theme.background, 'The draft contains an invalid theme.')
+  const colors = optionalRecord(theme.colors, 'The draft contains an invalid theme.')
+  const fonts = optionalRecord(theme.fonts, 'The draft contains an invalid theme.')
+  const layout = optionalRecord(theme.layout, 'The draft contains an invalid theme.')
+  const button = optionalRecord(theme.button, 'The draft contains an invalid theme.')
+  const profile = optionalRecord(theme.profile, 'The draft contains an invalid theme.')
   return {
-    background: { ...DEFAULT_THEME.background, ...(value.background ?? {}) }, colors: { ...DEFAULT_THEME.colors, ...(value.colors ?? {}) },
-    fonts: { ...DEFAULT_THEME.fonts, ...(value.fonts ?? {}) }, layout: { ...DEFAULT_THEME.layout, ...(value.layout ?? {}) },
-    button: { ...DEFAULT_THEME.button, ...(value.button ?? {}) }, profile: { ...DEFAULT_THEME.profile, ...(value.profile ?? {}) },
+    background: { ...DEFAULT_THEME.background, ...background }, colors: { ...DEFAULT_THEME.colors, ...colors },
+    fonts: { ...DEFAULT_THEME.fonts, ...fonts }, layout: { ...DEFAULT_THEME.layout, ...layout },
+    button: { ...DEFAULT_THEME.button, ...button }, profile: { ...DEFAULT_THEME.profile, ...profile },
   }
 }
 
+function sanitizeSeo(value) {
+  const seo = optionalRecord(value, 'The draft contains invalid SEO data.')
+  return { title: String(seo.title ?? '').slice(0, 80), description: String(seo.description ?? '').slice(0, 180), socialImagePath: typeof seo.socialImagePath === 'string' ? seo.socialImagePath : null }
+}
+
 export function parseDraftForSave(value = {}) {
+  value = requireRecord(value)
   const templateId = typeof value.templateId === 'string' ? value.templateId : ''
-  const blocks = Array.isArray(value.blocks) ? value.blocks : []
+  const blocks = value.blocks === undefined ? [] : Array.isArray(value.blocks) ? value.blocks : null
   if (!SITE_TEMPLATES.has(templateId)) throw siteError('invalid-argument', 'Choose a supported template.')
+  if (!blocks) throw siteError('invalid-argument', 'The draft contains an invalid block.')
   if (blocks.length > 40 || blocks.filter((block) => block?.type === 'link').length > 25) throw siteError('invalid-argument', 'A mini-site may contain up to 40 blocks and 25 links.')
   const normalizedBlocks = blocks.map((block) => {
     const keys = DRAFT_BLOCK_CONTENT_KEYS[block?.type]
     const id = typeof block?.id === 'string' ? block.id.trim() : ''
-    if (!keys || !id || id.length > 128 || !block.content || typeof block.content !== 'object') throw siteError('invalid-argument', 'The draft contains an invalid block.')
+    if (!keys || !id || id.length > 128 || !isRecord(block.content)) throw siteError('invalid-argument', 'The draft contains an invalid block.')
     const content = Object.fromEntries(keys.filter((key) => block.content[key] !== undefined).map((key) => [key, structuredClone(block.content[key])]))
     if (block.type === 'socials') content.links = Array.isArray(content.links) ? content.links.slice(0, 12) : []
     return { id, type: block.type, visible: block.visible !== false, content }
   })
-  return { name: parseName(value.name), templateId, blocks: normalizedBlocks, theme: sanitizeTheme(value.theme), seo: { title: String(value.seo?.title ?? '').slice(0, 80), description: String(value.seo?.description ?? '').slice(0, 180), socialImagePath: typeof value.seo?.socialImagePath === 'string' ? value.seo.socialImagePath : null } }
+  return { name: parseName(value.name), templateId, blocks: normalizedBlocks, theme: sanitizeTheme(value.theme), seo: sanitizeSeo(value.seo) }
 }
 
 export function parseEventInput(value = {}) {
+  value = requireRecord(value, 'Unsupported analytics event.')
   const type = value.type
   if (!['view', 'link_click'].includes(type)) throw siteError('invalid-argument', 'Unsupported analytics event.')
   const eventId = typeof value.eventId === 'string' ? value.eventId.trim() : ''
@@ -112,27 +141,29 @@ function sanitizeBlock(block) {
   if (!keys || !block?.id || block.visible === false) return null
   const content = Object.fromEntries(keys.filter((key) => block.content?.[key] !== undefined).map((key) => [key, structuredClone(block.content[key])]))
   if (block.type === 'link') content.url = sanitizeUrl(content.url)
-  if (block.type === 'socials') content.links = Array.isArray(content.links) ? content.links.slice(0, 12).map((link) => ({ network: String(link.network ?? '').slice(0, 30), label: String(link.label ?? '').slice(0, 60), url: sanitizeUrl(link.url) })).filter(({ url }) => url) : []
+  if (block.type === 'socials') content.links = Array.isArray(content.links) ? content.links.slice(0, 12).filter(isRecord).map((link) => ({ network: String(link.network ?? '').slice(0, 30), label: String(link.label ?? '').slice(0, 60), url: sanitizeUrl(link.url) })).filter(({ url }) => url) : []
   if (block.type === 'profile') delete content.avatarStoragePath
   return { id: String(block.id), type: block.type, visible: true, content }
 }
 
 export function validatePublishableDraft(draft) {
-  if (!draft?.name?.trim()) throw siteError('invalid-argument', 'Add a site name before publishing.')
+  draft = requireRecord(draft)
+  if (typeof draft.name !== 'string' || !draft.name.trim()) throw siteError('invalid-argument', 'Add a site name before publishing.')
   parseSlug(draft.slug)
   const visibleBlocks = Array.isArray(draft.blocks) ? draft.blocks.filter((block) => block?.visible !== false) : []
   if (visibleBlocks.some((block) => !block || typeof block !== 'object')) throw siteError('invalid-argument', 'The draft contains an invalid block.')
   if (!visibleBlocks.length) throw siteError('invalid-argument', 'Add at least one visible block before publishing.')
   if (visibleBlocks.length > 40 || visibleBlocks.filter((block) => block.type === 'link').length > 25) throw siteError('invalid-argument', 'A mini-site may contain up to 40 blocks and 25 links.')
   for (const block of visibleBlocks) {
-    if (block.type === 'link' && (!block.content?.label?.trim() || !sanitizeUrl(block.content?.url))) throw siteError('invalid-argument', 'Every visible link needs a label and valid destination.')
-    if (block.type === 'image' && block.content?.url && !block.content?.decorative && !block.content?.alt?.trim()) throw siteError('invalid-argument', 'Every visible image needs alternative text or must be decorative.')
+    if (block.type === 'link' && (typeof block.content?.label !== 'string' || !block.content.label.trim() || !sanitizeUrl(block.content?.url))) throw siteError('invalid-argument', 'Every visible link needs a label and valid destination.')
+    if (block.type === 'image' && block.content?.url && !block.content?.decorative && (typeof block.content?.alt !== 'string' || !block.content.alt.trim())) throw siteError('invalid-argument', 'Every visible image needs alternative text or must be decorative.')
   }
   return draft
 }
 
 export function sanitizeSnapshot(draft) {
-  return { schemaVersion: 1, siteId: String(draft.siteId ?? ''), slug: parseSlug(draft.slug), revision: Number.isInteger(draft.draftRevision) ? draft.draftRevision : 0, blocks: Array.isArray(draft.blocks) ? draft.blocks.map(sanitizeBlock).filter(Boolean).slice(0, 40) : [], theme: sanitizeTheme(draft.theme), seo: { title: String(draft.seo?.title ?? '').slice(0, 80), description: String(draft.seo?.description ?? '').slice(0, 180), socialImagePath: typeof draft.seo?.socialImagePath === 'string' ? draft.seo.socialImagePath : null } }
+  draft = requireRecord(draft)
+  return { schemaVersion: 1, siteId: String(draft.siteId ?? ''), slug: parseSlug(draft.slug), revision: Number.isInteger(draft.draftRevision) ? draft.draftRevision : 0, blocks: Array.isArray(draft.blocks) ? draft.blocks.map(sanitizeBlock).filter(Boolean).slice(0, 40) : [], theme: sanitizeTheme(draft.theme), seo: sanitizeSeo(draft.seo) }
 }
 
 export function createInitialDraft({ siteId, name, slug, templateId, now }) {

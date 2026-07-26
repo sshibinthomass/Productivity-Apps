@@ -36,6 +36,15 @@ describe('mini-site lifecycle service', () => {
     }
   })
 
+  it.each([{}, [], ' ', '\t', 0])('rejects non-string or blank user IDs before calling the store', async (userId) => {
+    let calls = 0
+    const service = createMiniSiteService({
+      store: { async create() { calls += 1 } },
+    })
+    await expect(service.createMiniSite({ userId, data: validCreateInput })).rejects.toMatchObject({ code: 'unauthenticated' })
+    expect(calls).toBe(0)
+  })
+
   it('creates sites through the five-site boundary and preserves template differences', async () => {
     const store = createStore({ siteCount: 4 }); let nextId = 4
     const service = createMiniSiteService({ store, createId: () => `site-${++nextId}`, now: () => '2026-07-26T10:00:00.000Z' })

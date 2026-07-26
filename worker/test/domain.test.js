@@ -26,6 +26,10 @@ describe('mini-site domain validation', () => {
     expect(() => parseCreateInput(input)).toThrowError(expect.objectContaining({ code: 'invalid_argument' }))
   })
 
+  it.each([null, [], 'not-an-object'])('rejects malformed create payloads with a stable validation error', (input) => {
+    expect(() => parseCreateInput(input)).toThrowError(expect.objectContaining({ code: 'invalid_argument' }))
+  })
+
   it('validates site identifiers and public slugs', () => {
     expect(parseSiteId(' site-1 ')).toBe('site-1')
     expect(parseSlug('maya-studio')).toBe('maya-studio')
@@ -67,7 +71,17 @@ describe('mini-site domain validation', () => {
   it.each([
     { name: 'Maya', templateId: 'blank', blocks: [null] },
     { name: 'Maya', templateId: 'blank', blocks: [{ id: 'link-1', type: 'link', content: null }] },
+    { name: 'Maya', templateId: 'blank', blocks: [{ id: 'link-1', type: 'link', content: [] }] },
   ])('rejects malformed draft blocks with a stable validation error', (draft) => {
+    expect(() => parseDraftForSave(draft)).toThrowError(expect.objectContaining({ code: 'invalid_argument' }))
+  })
+
+  it.each([
+    null,
+    { name: 'Maya', templateId: 'blank', blocks: [], theme: null },
+    { name: 'Maya', templateId: 'blank', blocks: [], theme: { colors: null } },
+    { name: 'Maya', templateId: 'blank', blocks: [], theme: { colors: [] } },
+  ])('rejects malformed draft payload structures with a stable validation error', (draft) => {
     expect(() => parseDraftForSave(draft)).toThrowError(expect.objectContaining({ code: 'invalid_argument' }))
   })
 
@@ -80,6 +94,10 @@ describe('mini-site domain validation', () => {
       { slug: 'maya-studio', type: 'link_click', eventId: 'event-12345678' },
       { slug: 'maya-studio', type: 'view', eventId: 'short' },
     ]) expect(() => parseEventInput(input)).toThrowError(expect.objectContaining({ code: 'invalid_argument' }))
+  })
+
+  it.each([null, [], 'not-an-object'])('rejects malformed event payloads with a stable validation error', (input) => {
+    expect(() => parseEventInput(input)).toThrowError(expect.objectContaining({ code: 'invalid_argument' }))
   })
 
   it('sanitizes a draft into an allowlisted public snapshot', () => {
@@ -101,11 +119,38 @@ describe('mini-site domain validation', () => {
     expect(snapshot.theme.injected).toBeUndefined()
   })
 
+  it('drops malformed social entries while sanitizing public snapshots', () => {
+    expect(sanitizeSnapshot({
+      slug: 'maya-studio',
+      blocks: [{ id: 'social-1', type: 'socials', visible: true, content: {
+        links: [null, { network: 'Web', label: 'Portfolio', url: 'https://example.com' }],
+      } }],
+    }).blocks[0].content.links).toEqual([
+      { network: 'Web', label: 'Portfolio', url: 'https://example.com/' },
+    ])
+  })
+
+  it.each([
+    null,
+    { slug: 'maya-studio', theme: null },
+    { slug: 'maya-studio', theme: { background: [] } },
+  ])('rejects malformed snapshot structures with a stable validation error', (draft) => {
+    expect(() => sanitizeSnapshot(draft)).toThrowError(expect.objectContaining({ code: 'invalid_argument' }))
+  })
+
   it('rejects incomplete visible links and accessible images before publishing', () => {
     for (const blocks of [
       [{ id: 'link-1', type: 'link', visible: true, content: { label: 'Portfolio', url: '' } }],
       [{ id: 'image-1', type: 'image', visible: true, content: { url: 'https://example.com/image.webp', decorative: false, alt: '' } }],
     ]) expect(() => validatePublishableDraft({ name: 'Maya Studio', slug: 'maya-studio', blocks })).toThrowError(expect.objectContaining({ code: 'invalid_argument' }))
+  })
+
+  it.each([
+    { name: {}, slug: 'maya-studio', blocks: [] },
+    { name: 'Maya Studio', slug: 'maya-studio', blocks: [{ id: 'link-1', type: 'link', visible: true, content: { label: {}, url: 'https://example.com' } }] },
+    { name: 'Maya Studio', slug: 'maya-studio', blocks: [{ id: 'image-1', type: 'image', visible: true, content: { url: 'https://example.com/image.webp', alt: {}, decorative: false } }] },
+  ])('rejects non-string publishable text with a stable validation error', (draft) => {
+    expect(() => validatePublishableDraft(draft)).toThrowError(expect.objectContaining({ code: 'invalid_argument' }))
   })
 
   it('rejects malformed published blocks with a stable validation error', () => {
