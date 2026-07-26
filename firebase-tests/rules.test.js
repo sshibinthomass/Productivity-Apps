@@ -65,18 +65,11 @@ afterAll(async () => {
 })
 
 describe('Firestore mini-site rules', () => {
-  it('allows owners to read and update editable draft fields', async () => {
+  it('allows owners to read drafts', async () => {
     const db = testEnv.authenticatedContext('user-1').firestore()
 
     await assertSucceeds(db.doc('users/user-1/sites/site-1').get())
     await assertSucceeds(db.collection('users/user-1/sites').get())
-    await assertSucceeds(
-      db.doc('users/user-1/sites/site-1').update({
-        name: 'Maya Works',
-        draftRevision: 1,
-        updatedAt: 'next-server-value',
-      }),
-    )
   })
 
   it('denies signed-out and cross-user draft access', async () => {
@@ -103,18 +96,12 @@ describe('Firestore mini-site rules', () => {
     )
   })
 
-  it('enforces the 25-block server boundary on draft updates', async () => {
+  it('routes every draft mutation through callable backend validation', async () => {
     const db = testEnv.authenticatedContext('user-1').firestore()
-    const blocks = Array.from({ length: 26 }, (_, index) => ({
-      id: `link-${index}`,
-      type: 'link',
-      visible: true,
-      content: { label: `Link ${index}`, url: 'https://example.com' },
-    }))
 
     await assertFails(
       db.doc('users/user-1/sites/site-1').update({
-        blocks,
+        name: 'Direct client edit',
         draftRevision: 1,
         updatedAt: 'next',
       }),

@@ -52,6 +52,21 @@ function createMemoryStore({ siteCount = 0 } = {}) {
     async get({ uid, siteId }) {
       return structuredClone(sites.get(`${uid}/${siteId}`) ?? null)
     },
+    async saveDraft({ uid, siteId, draft, expectedRevision }) {
+      const key = `${uid}/${siteId}`
+      const current = sites.get(key)
+      if (!current) return { code: 'not-found' }
+      if (current.draftRevision !== expectedRevision) {
+        return { code: 'revision-conflict' }
+      }
+      const saved = {
+        ...current,
+        ...structuredClone(draft),
+        draftRevision: current.draftRevision + 1,
+      }
+      sites.set(key, saved)
+      return structuredClone(saved)
+    },
     async duplicate({ uid, sourceSiteId, draft }) {
       if (!sites.has(`${uid}/${sourceSiteId}`)) return { code: 'not-found' }
       return this.create({ uid, draft })
@@ -176,6 +191,65 @@ describe('mini-site lifecycle service', () => {
     expect(creator.blocks).not.toEqual(bold.blocks)
   })
 
+  it('saves owner drafts with revision and link limits enforced', async () => {
+    const store = createMemoryStore()
+    const original = makeDraft()
+    store.sites.set('user-1/site-1', original)
+    const service = createMiniSiteService({ store })
+
+    await expect(
+      service.saveMiniSiteDraft({
+        auth: { uid: 'user-1' },
+        data: {
+          siteId: 'site-1',
+          expectedRevision: 1,
+          draft: { ...original, name: 'Updated site' },
+        },
+      }),
+    ).resolves.toMatchObject({
+      name: 'Updated site',
+      draftRevision: 2,
+    })
+
+    await expect(
+      service.saveMiniSiteDraft({
+        auth: { uid: 'user-1' },
+        data: {
+          siteId: 'site-1',
+          expectedRevision: 2,
+          draft: {
+            ...original,
+            blocks: Array.from({ length: 26 }, (_, index) => ({
+              id: `link-${index}`,
+              type: 'link',
+              visible: true,
+              content: { label: `Link ${index}`, url: '' },
+            })),
+          },
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'invalid-argument' })
+
+    await expect(
+      service.saveMiniSiteDraft({
+        auth: { uid: 'user-1' },
+        data: {
+          siteId: 'site-1',
+          expectedRevision: 2,
+          draft: {
+            ...original,
+            blocks: Array.from({ length: 40 }, (_, index) => ({
+              id: `paragraph-${index}`,
+              type: 'paragraph',
+              visible: true,
+              content: { text: `Paragraph ${index}` },
+            })),
+          },
+        },
+      }),
+    ).resolves.toMatchObject({ draftRevision: 3 })
+  })
+
   it('changes slugs, publishes sanitized snapshots, and unpublishes', async () => {
     const store = createMemoryStore()
     store.sites.set('user-1/site-1', makeDraft())
@@ -225,14 +299,17 @@ describe('mini-site lifecycle service', () => {
     })
     store.sites.set('user-1/site-1', draft)
     store.promoteAssets = async ({ draft: source }) => ({
-      ...source,
-      blocks: source.blocks.map((block) => ({
-        ...block,
-        content: {
-          ...block.content,
-          url: 'https://storage.example/public/image-1.webp',
-        },
-      })),
+      draft: {
+        ...source,
+        blocks: source.blocks.map((block) => ({
+          ...block,
+          content: {
+            ...block.content,
+            url: 'https://storage.example/public/image-1.webp',
+          },
+        })),
+      },
+      publicPaths: ['mini-site-public/site-1/1/image-1.webp'],
     })
     const service = createMiniSiteService({ store })
 
@@ -302,6 +379,14 @@ describe('mini-site lifecycle service', () => {
     const store = createMemoryStore()
     const draft = makeDraft()
     store.sites.set('user-1/site-1', draft)
+    let cleanedPaths = null
+    store.promoteAssets = async () => ({
+      draft,
+      publicPaths: ['mini-site-public/site-1/1/image.webp'],
+    })
+    store.cleanupPromotedAssets = async ({ publicPaths }) => {
+      cleanedPaths = publicPaths
+    }
     store.publish = async () => ({ code: 'revision-conflict' })
     const service = createMiniSiteService({ store })
 
@@ -311,6 +396,9 @@ describe('mini-site lifecycle service', () => {
         data: { siteId: 'site-1' },
       }),
     ).rejects.toMatchObject({ code: 'aborted' })
+    expect(cleanedPaths).toEqual([
+      'mini-site-public/site-1/1/image.webp',
+    ])
   })
 
   it('requires ownership and exact confirmation before deletion', async () => {

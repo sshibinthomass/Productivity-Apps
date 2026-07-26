@@ -254,6 +254,63 @@ export function parseSiteId(value) {
   return siteId
 }
 
+export function parseDraftForSave(value = {}) {
+  const templateId =
+    typeof value.templateId === 'string' ? value.templateId : ''
+  const blocks = Array.isArray(value.blocks) ? value.blocks : []
+  if (!SITE_TEMPLATES.has(templateId)) {
+    throw functionError('invalid-argument', 'Choose a supported template.')
+  }
+  if (
+    blocks.length > 40 ||
+    blocks.filter(({ type }) => type === 'link').length > 25
+  ) {
+    throw functionError(
+      'invalid-argument',
+      'A mini-site may contain up to 40 blocks and 25 links.',
+    )
+  }
+
+  const normalizedBlocks = blocks.map((block) => {
+    const keys = BLOCK_CONTENT_KEYS[block?.type]
+    const id = typeof block?.id === 'string' ? block.id.trim() : ''
+    if (!keys || !id || id.length > 128 || typeof block.content !== 'object') {
+      throw functionError('invalid-argument', 'The draft contains an invalid block.')
+    }
+    const content = Object.fromEntries(
+      keys
+        .filter((key) => block.content[key] !== undefined)
+        .map((key) => [key, structuredClone(block.content[key])]),
+    )
+    if (block.type === 'socials') {
+      content.links = Array.isArray(content.links)
+        ? content.links.slice(0, 12)
+        : []
+    }
+    return {
+      id,
+      type: block.type,
+      visible: block.visible !== false,
+      content,
+    }
+  })
+
+  return {
+    name: parseName(value.name),
+    templateId,
+    blocks: normalizedBlocks,
+    theme: sanitizeTheme(value.theme),
+    seo: {
+      title: String(value.seo?.title ?? '').slice(0, 80),
+      description: String(value.seo?.description ?? '').slice(0, 180),
+      socialImagePath:
+        typeof value.seo?.socialImagePath === 'string'
+          ? value.seo.socialImagePath
+          : null,
+    },
+  }
+}
+
 export function parseEventInput(value = {}) {
   const type = value.type
   if (!['view', 'link_click'].includes(type)) {
@@ -358,12 +415,12 @@ export function validatePublishableDraft(draft) {
     )
   }
   if (
-    visibleBlocks.length > 25 ||
+    visibleBlocks.length > 40 ||
     visibleBlocks.filter(({ type }) => type === 'link').length > 25
   ) {
     throw functionError(
       'invalid-argument',
-      'A mini-site may contain up to 25 blocks.',
+      'A mini-site may contain up to 40 blocks and 25 links.',
     )
   }
 
@@ -402,7 +459,7 @@ export function sanitizeSnapshot(draft) {
       ? draft.draftRevision
       : 0,
     blocks: Array.isArray(draft.blocks)
-      ? draft.blocks.map(sanitizeBlock).filter(Boolean).slice(0, 25)
+      ? draft.blocks.map(sanitizeBlock).filter(Boolean).slice(0, 40)
       : [],
     theme: sanitizeTheme(draft.theme),
     seo: {

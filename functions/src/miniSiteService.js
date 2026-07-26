@@ -4,6 +4,7 @@ import {
   createInitialDraft,
   functionError,
   parseCreateInput,
+  parseDraftForSave,
   parseEventInput,
   parseSiteId,
   parseSlug,
@@ -85,6 +86,27 @@ export function createMiniSiteService({
       )
     },
 
+    async saveMiniSiteDraft(request) {
+      const uid = assertAuthenticated(request.auth)
+      const siteId = parseSiteId(request.data?.siteId)
+      const expectedRevision = request.data?.expectedRevision
+      if (!Number.isInteger(expectedRevision) || expectedRevision < 0) {
+        throw functionError(
+          'invalid-argument',
+          'Choose a valid draft revision.',
+        )
+      }
+      const draft = parseDraftForSave(request.data?.draft)
+      return throwStoreError(
+        await store.saveDraft({
+          uid,
+          siteId,
+          draft,
+          expectedRevision,
+        }),
+      )
+    },
+
     async changeMiniSiteSlug(request) {
       const uid = assertAuthenticated(request.auth)
       const siteId = parseSiteId(request.data?.siteId)
@@ -92,24 +114,38 @@ export function createMiniSiteService({
       return throwStoreError(await store.changeSlug({ uid, siteId, slug }))
     },
 
-      async publishMiniSite(request) {
+    async publishMiniSite(request) {
       const uid = assertAuthenticated(request.auth)
       const siteId = parseSiteId(request.data?.siteId)
-        const draft = await store.get({ uid, siteId })
-        if (!draft) throwStoreError({ code: 'not-found' })
-        validatePublishableDraft(draft)
-        const publishableDraft = store.promoteAssets
+      const draft = await store.get({ uid, siteId })
+      if (!draft) throwStoreError({ code: 'not-found' })
+      validatePublishableDraft(draft)
+      const promotion = store.promoteAssets
         ? await store.promoteAssets({ uid, siteId, draft })
-        : draft
-      return throwStoreError(
-        await store.publish({
-          uid,
-          siteId,
-          snapshot: sanitizeSnapshot(publishableDraft),
-          expectedRevision: draft.draftRevision ?? 0,
-          now: now(),
-        }),
-      )
+        : { draft, publicPaths: [] }
+      try {
+        return throwStoreError(
+          await store.publish({
+            uid,
+            siteId,
+            snapshot: sanitizeSnapshot(promotion.draft),
+            expectedRevision: draft.draftRevision ?? 0,
+            now: now(),
+          }),
+        )
+      } catch (error) {
+        if (
+          promotion.publicPaths.length > 0 &&
+          store.cleanupPromotedAssets
+        ) {
+          await store
+            .cleanupPromotedAssets({
+              publicPaths: promotion.publicPaths,
+            })
+            .catch(() => undefined)
+        }
+        throw error
+      }
     },
 
     async unpublishMiniSite(request) {

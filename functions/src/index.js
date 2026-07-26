@@ -40,6 +40,7 @@ function asCallable(operation) {
 
 export const createMiniSite = asCallable(service.createMiniSite)
 export const duplicateMiniSite = asCallable(service.duplicateMiniSite)
+export const saveMiniSiteDraft = asCallable(service.saveMiniSiteDraft)
 export const changeMiniSiteSlug = asCallable(service.changeMiniSiteSlug)
 export const publishMiniSite = asCallable(service.publishMiniSite)
 export const unpublishMiniSite = asCallable(service.unpublishMiniSite)

@@ -6,8 +6,6 @@ import {
   limit,
   orderBy,
   query,
-  runTransaction,
-  serverTimestamp,
 } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
@@ -22,8 +20,6 @@ const firebaseSdk = {
   limit,
   orderBy,
   query,
-  runTransaction,
-  serverTimestamp,
   httpsCallable,
   ref,
   uploadBytes,
@@ -59,6 +55,7 @@ export function createMiniSiteRepository(client, sdk = firebaseSdk) {
     [
       'createMiniSite',
       'duplicateMiniSite',
+      'saveMiniSiteDraft',
       'changeMiniSiteSlug',
       'publishMiniSite',
       'unpublishMiniSite',
@@ -117,37 +114,14 @@ export function createMiniSiteRepository(client, sdk = firebaseSdk) {
       return { id: siteId, ...normalizeDraft(snapshot.data()) }
     },
 
-    async saveDraft(uid, siteId, draft, expectedRevision) {
-      const db = getDatabase()
-      const siteRef = sdk.doc(db, 'users', uid, 'sites', siteId)
-      return sdk.runTransaction(db, async (transaction) => {
-        const snapshot = await transaction.get(siteRef)
-        if (!snapshot.exists()) {
-          const error = new Error('This mini-site could not be found.')
-          error.code = 'not-found'
-          throw error
-        }
-        const currentRevision = snapshot.data().draftRevision ?? 0
-        if (currentRevision !== expectedRevision) {
-          const error = new Error(
-            'This mini-site changed in another session. Reload before saving.',
-          )
-          error.code = 'revision-conflict'
-          throw error
-        }
-        const normalized = normalizeDraft(draft)
-        const nextRevision = currentRevision + 1
-        transaction.update(siteRef, {
-          name: normalized.name,
-          templateId: normalized.templateId,
-          blocks: normalized.blocks,
-          theme: normalized.theme,
-          seo: normalized.seo,
-          draftRevision: nextRevision,
-          updatedAt: sdk.serverTimestamp?.() ?? new Date().toISOString(),
-        })
-        return { ...normalized, id: siteId, draftRevision: nextRevision }
+    async saveDraft(_uid, siteId, draft, expectedRevision) {
+      const normalized = normalizeDraft(draft)
+      const result = await lifecycle.saveMiniSiteDraft({
+        siteId,
+        expectedRevision,
+        draft: normalized,
       })
+      return { ...normalizeDraft(result), id: siteId }
     },
 
     async getPublished(slug) {

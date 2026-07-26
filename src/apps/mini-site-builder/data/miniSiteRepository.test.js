@@ -74,6 +74,22 @@ function createFakeSdk() {
       }),
     httpsCallable: (_functions, name) => async (payload) => {
       calls.push(['callable', name, payload])
+      if (name === 'saveMiniSiteDraft') {
+        const path = `users/user-1/sites/${payload.siteId}`
+        const current = documents.get(path)
+        if (current.draftRevision !== payload.expectedRevision) {
+          const error = new Error('Revision conflict')
+          error.code = 'revision-conflict'
+          throw error
+        }
+        const saved = {
+          ...current,
+          ...payload.draft,
+          draftRevision: current.draftRevision + 1,
+        }
+        documents.set(path, saved)
+        return { data: saved }
+      }
       return { data: { siteId: 'site-new', slug: payload.slug } }
     },
     ref: (_storage, path) => path,

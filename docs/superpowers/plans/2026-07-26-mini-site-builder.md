@@ -14,7 +14,7 @@
 - Builder, creation, editing, publishing, deletion, and analytics require Google sign-in.
 - Published mini-sites are publicly readable at `/s/:slug`.
 - Slugs are lowercase ASCII, 3–40 characters, and globally unique.
-- A site may contain at most 25 blocks, all of which may be link blocks.
+- A site may contain at most 40 blocks and at most 25 link blocks.
 - Uploads accept JPEG, PNG, WebP, or GIF images up to 5 MiB.
 - Draft autosave waits 700 ms after the most recent edit.
 - Publishing requires WCAG AA contrast for primary page text and link-button text.
@@ -95,7 +95,7 @@
 
 Cover a five-site constant, all eight block types, stable block IDs, a blank
 draft with profile and link blocks, immutable update/move/duplicate/remove,
-normalization of malformed input and a 25-block cap that also bounds links.
+normalization of malformed input, a 40-block cap, and a 25-link cap.
 
 - [ ] **Step 2: Run the focused model tests**
 

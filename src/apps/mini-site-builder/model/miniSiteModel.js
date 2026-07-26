@@ -1,7 +1,7 @@
 import { cloneTemplate } from './templates.js'
 
 export const SITE_LIMIT = 5
-export const BLOCK_LIMIT = 25
+export const BLOCK_LIMIT = 40
 export const LINK_BLOCK_LIMIT = 25
 export const BLOCK_TYPES = [
   'profile',

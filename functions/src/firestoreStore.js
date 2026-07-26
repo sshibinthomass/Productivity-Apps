@@ -69,6 +69,25 @@ export function createFirestoreStore({
         : null
     },
 
+    async saveDraft({ uid, siteId, draft, expectedRevision }) {
+      return db.runTransaction(async (transaction) => {
+        const siteRef = db.doc(sitePath(uid, siteId))
+        const snapshot = await transaction.get(siteRef)
+        if (!snapshot.exists) return { code: 'not-found' }
+        const currentRevision = snapshot.data().draftRevision ?? 0
+        if (currentRevision !== expectedRevision) {
+          return { code: 'revision-conflict' }
+        }
+        const nextRevision = currentRevision + 1
+        transaction.update(siteRef, {
+          ...draft,
+          draftRevision: nextRevision,
+          updatedAt: FieldValue.serverTimestamp(),
+        })
+        return { ...draft, siteId, draftRevision: nextRevision }
+      })
+    },
+
     async duplicate({ uid, draft }) {
       return this.create({ uid, draft })
     },
@@ -113,7 +132,7 @@ export function createFirestoreStore({
       const bucket = getBucket()
       const revision = draft.draftRevision ?? 0
       const nextDraft = structuredClone(draft)
-      const copies = []
+      const promotions = []
       const allowedPrefix = `mini-site-drafts/${uid}/${siteId}/`
 
       for (const block of nextDraft.blocks ?? []) {
@@ -133,15 +152,40 @@ export function createFirestoreStore({
         }
         const filename = storagePath.split('/').at(-1)
         const publicPath = `mini-site-public/${siteId}/${revision}/${filename}`
-        copies.push(bucket.file(storagePath).copy(bucket.file(publicPath)))
+        promotions.push({ storagePath, publicPath })
         if (block.type === 'image') {
           block.content.url = publicAssetUrl(bucket, publicPath)
         } else {
           block.content.avatarUrl = publicAssetUrl(bucket, publicPath)
         }
       }
-      await Promise.all(copies)
-      return nextDraft
+      try {
+        await Promise.all(
+          promotions.map(({ storagePath, publicPath }) =>
+            bucket.file(storagePath).copy(bucket.file(publicPath)),
+          ),
+        )
+      } catch (error) {
+        await Promise.allSettled(
+          promotions.map(({ publicPath }) =>
+            bucket.file(publicPath).delete({ ignoreNotFound: true }),
+          ),
+        )
+        throw error
+      }
+      return {
+        draft: nextDraft,
+        publicPaths: promotions.map(({ publicPath }) => publicPath),
+      }
+    },
+
+    async cleanupPromotedAssets({ publicPaths }) {
+      const bucket = getBucket()
+      await Promise.allSettled(
+        publicPaths.map((publicPath) =>
+          bucket.file(publicPath).delete({ ignoreNotFound: true }),
+        ),
+      )
     },
 
     async publish({ uid, siteId, snapshot, expectedRevision }) {

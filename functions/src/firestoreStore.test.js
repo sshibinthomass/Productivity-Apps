@@ -39,7 +39,7 @@ describe('Firestore store asset boundary', () => {
     })
 
     expect(getBucket).not.toHaveBeenCalled()
-    const draft = await store.promoteAssets({
+    const promotion = await store.promoteAssets({
       uid: 'user-1',
       siteId: 'site-1',
       draft: {
@@ -59,9 +59,12 @@ describe('Firestore store asset boundary', () => {
 
     expect(getBucket).toHaveBeenCalledTimes(1)
     expect(copy).toHaveBeenCalledOnce()
-    expect(draft.blocks[0].content.url).toBe(
+    expect(promotion.draft.blocks[0].content.url).toBe(
       'https://firebasestorage.googleapis.com/v0/b/example.firebasestorage.app/o/mini-site-public%2Fsite-1%2F3%2Fimage-1.webp?alt=media',
     )
+    expect(promotion.publicPaths).toEqual([
+      'mini-site-public/site-1/3/image-1.webp',
+    ])
   })
 
   it('rejects draft assets owned by another user or site', async () => {

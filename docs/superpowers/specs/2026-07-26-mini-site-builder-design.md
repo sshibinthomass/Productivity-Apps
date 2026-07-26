@@ -142,7 +142,7 @@ content. The initial block types are:
 
 Users can add, select, edit, reorder, hide/show, duplicate, and delete blocks.
 Reordering supports pointer controls and explicit Move up/Move down buttons for
-keyboard accessibility. A site may contain at most 25 blocks, all of which may
+keyboard accessibility. A site may contain at most 40 blocks, 25 of which may
 be link blocks.
 
 Text is stored as plain text and never interpreted as HTML. Link destinations
