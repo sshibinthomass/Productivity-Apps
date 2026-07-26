@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom'
+import { Link, Outlet, useLocation } from 'react-router-dom'
 import AuthControls from './AuthControls.jsx'
 import BrandLogo from './BrandLogo.jsx'
 import ThemeToggle from './ThemeToggle.jsx'
@@ -26,7 +26,7 @@ export default function Layout({ children }) {
           <AuthControls />
         </nav>
       </header>
-      <main className="site-main">{children}</main>
+      <main className="site-main">{children ?? <Outlet />}</main>
       <footer className="site-footer">
         <p>Where Intelligence Meets Reality.</p>
         <p>Arvenilo Network</p>

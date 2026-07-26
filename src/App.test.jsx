@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useAuth } from './auth/authContext.js'
 import App from './App.jsx'
+import { MiniSiteRepositoryProvider } from './apps/mini-site-builder/data/repositoryContext.jsx'
 import ThemeProvider from './theme/ThemeProvider.jsx'
 
 vi.mock('./auth/authContext.js', () => ({
@@ -13,7 +14,7 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-function renderAt(path, registry) {
+function renderAt(path, registry, repository) {
   useAuth.mockReturnValue({
     user: null,
     isAuthLoading: false,
@@ -22,10 +23,17 @@ function renderAt(path, registry) {
     signOutUser: vi.fn(),
   })
 
+  const app = <App registry={registry} />
   return render(
     <MemoryRouter initialEntries={[path]}>
       <ThemeProvider>
-        <App registry={registry} />
+        {repository ? (
+          <MiniSiteRepositoryProvider repository={repository}>
+            {app}
+          </MiniSiteRepositoryProvider>
+        ) : (
+          app
+        )}
       </ThemeProvider>
     </MemoryRouter>,
   )
@@ -87,5 +95,37 @@ describe('App authentication routes', () => {
       screen.getByRole('button', { name: 'Continue with Google' }),
     ).toBeTruthy()
     expect(screen.queryByText('Private fixture app')).toBeNull()
+  })
+
+  it('renders public mini-sites outside the Arvenilo application layout', async () => {
+    const repository = {
+      getPublished: vi.fn().mockResolvedValue({
+        slug: 'maya-studio',
+        theme: {},
+        seo: { title: 'Maya Studio', description: '' },
+        blocks: [
+          {
+            id: 'profile',
+            type: 'profile',
+            visible: true,
+            content: {
+              avatarUrl: '',
+              displayName: 'Maya Studio',
+              bio: '',
+              alt: '',
+            },
+          },
+        ],
+      }),
+      recordEvent: vi.fn().mockResolvedValue({ recorded: true }),
+    }
+
+    renderAt('/s/maya-studio', undefined, repository)
+
+    expect(
+      await screen.findByRole('heading', { name: 'Maya Studio' }),
+    ).toBeTruthy()
+    expect(screen.queryByLabelText('Arvenilo Network home')).toBeNull()
+    expect(screen.queryByText('Where Intelligence Meets Reality.')).toBeNull()
   })
 })

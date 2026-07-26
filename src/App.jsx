@@ -5,13 +5,15 @@ import { appRegistry, isRoutableApp } from './config/appRegistry.jsx'
 import HomePage from './pages/HomePage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
+import PublicMiniSitePage from './apps/mini-site-builder/PublicMiniSitePage.jsx'
 
 export default function App({ registry = appRegistry }) {
   const routableApps = registry.filter(isRoutableApp)
 
   return (
-    <Layout>
-      <Routes>
+    <Routes>
+      <Route path="/s/:slug" element={<PublicMiniSitePage />} />
+      <Route element={<Layout />}>
         <Route index element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         {routableApps.map((app) => {
@@ -33,7 +35,7 @@ export default function App({ registry = appRegistry }) {
           )
         })}
         <Route path="*" element={<NotFoundPage />} />
-      </Routes>
-    </Layout>
+      </Route>
+    </Routes>
   )
 }
