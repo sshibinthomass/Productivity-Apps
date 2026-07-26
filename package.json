@@ -37,7 +37,8 @@
     "vitest": "4.1.10"
   },
   "optionalDependencies": {
-    "@rolldown/binding-linux-x64-gnu": "1.1.5"
+    "@rolldown/binding-linux-x64-gnu": "1.1.5",
+    "lightningcss-linux-x64-gnu": "1.33.0"
   },
   "engines": {
     "node": ">=22.12.0"
