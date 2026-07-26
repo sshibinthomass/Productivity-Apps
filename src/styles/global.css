@@ -855,6 +855,10 @@ p {
   margin-top: var(--space-4);
 }
 
+.login-card .eyebrow {
+  color: var(--color-context-slate);
+}
+
 .login-card__intro {
   color: var(--color-context-slate);
   margin: var(--space-5) 0 var(--space-6);

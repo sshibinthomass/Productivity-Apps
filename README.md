@@ -1,16 +1,20 @@
-# Productivity Apps
+# Arvenilo Network
 
-A growing collection of focused React tools in one Vite application.
+Arvenilo Network is a growing directory of focused React productivity
+applications built with the Precision Spatial design system.
 
 The site supports optional Google sign-in through Firebase Authentication.
 Multi Link Opener and the home page remain public; future tools can opt into
 the shared account session through registry metadata.
 
-## Included apps
+## Application network
 
-- **Multi Link Opener** — paste one link per line and open every valid
+- **Multi Link Opener** — `AVAILABLE NOW` — paste one link per line and open every valid
   destination in a separate tab, either immediately or at a selected
   whole-second interval. The first link always loads immediately.
+- **Text Formatter** — `COMING SOON`
+- **Focus Timer** — `COMING SOON`
+- **Quick Notes** — `COMING SOON`
 
 The opener removes common list markers, wrappers, and invisible copy-paste
 characters, reports every adjusted or invalid entry, and accepts up to 100
@@ -67,23 +71,26 @@ To add another tool:
 
 1. Create `src/apps/<app-name>/<AppName>Page.jsx`.
 2. Keep its tool-specific styles, helpers, and tests in the same folder.
-3. Add its title, description, icon, path, accent, and component to
+3. Add its title, description, category, status, icon, path, accent, and
+   component to
    `src/config/appRegistry.jsx`.
 4. Set `requiresAuth: false` for a public tool or `requiresAuth: true` for a
    tool that needs a signed-in Google account.
 
-The registry automatically supplies both the home-page card and the route.
+The registry supplies every home-page card. Only entries marked `available`
+with a path and component receive a route; `coming-soon` entries remain
+non-interactive announcements.
 Only protected registry entries redirect signed-out visitors to `/login`.
 Client-side route protection is not a backend authorization boundary; future
 databases or APIs must independently enforce access.
 
 ## Firebase Authentication
 
-Use one Firebase project for the complete Productivity Apps suite:
+Use one Firebase project for the complete Arvenilo Network suite:
 
 1. Open the [Firebase Console](https://console.firebase.google.com/) and create
-   a project named **Productivity Apps**.
-2. Register a Web app named **Productivity Apps Web**.
+   a project named **Arvenilo Network**.
+2. Register a Web app named **Arvenilo Network Web**.
 3. Under **Authentication → Sign-in method**, enable **Google** and select the
    project owner's email as the support email.
 4. Under **Authentication → Settings → Authorized domains**, confirm
