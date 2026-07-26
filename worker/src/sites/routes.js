@@ -23,6 +23,21 @@ function sitePath(pathname) {
   return { siteId: safeSiteId(match[1]), action: match[2] ?? null }
 }
 
+function assetPath(pathname) {
+  const match = /^\/v1\/sites\/([^/]+)\/assets(?:\/([^/]+))?$/.exec(pathname)
+  if (!match) return null
+  let assetId = null
+  if (match[2]) {
+    try { assetId = decodeURIComponent(match[2]) } catch { throw new ApiError('invalid_argument', 'Choose a valid asset.', 400) }
+    if (!assetId || assetId.length > 128) throw new ApiError('invalid_argument', 'Choose a valid asset.', 400)
+  }
+  return { siteId: safeSiteId(match[1]), assetId }
+}
+
+export function requiresMultipartAssetUpload(request) {
+  return request.method === 'POST' && /^\/v1\/sites\/[^/]+\/assets$/.test(new URL(request.url).pathname)
+}
+
 export function requiresJsonSiteBody(request) {
   const { pathname } = new URL(request.url)
   if (pathname === '/v1/sites') return request.method === 'POST'
@@ -60,7 +75,7 @@ function siteResponse(site, status = 200) {
   return Response.json({ site }, { status })
 }
 
-export function createSiteRoutes({ auth, store, service = createMiniSiteService({ store }), requireUser = requireAuthenticatedUser } = {}) {
+export function createSiteRoutes({ auth, store, assets, service = createMiniSiteService({ store, assets }), requireUser = requireAuthenticatedUser } = {}) {
   if (!auth) throw new TypeError('An auth instance is required.')
   if (!store) throw new TypeError('A mini-site store is required.')
 
@@ -71,6 +86,24 @@ export function createSiteRoutes({ auth, store, service = createMiniSiteService(
   return {
     async handle(request) {
       const { pathname } = new URL(request.url)
+      const asset = assetPath(pathname)
+      if (asset) {
+        const user = await currentUser(request)
+        if (request.method === 'POST' && !asset.assetId) {
+          if (!assets) throw new TypeError('An asset service is required.')
+          return Response.json({ asset: await assets.uploadDraft({ userId: user.id, siteId: asset.siteId, request }) }, { status: 201 })
+        }
+        if (request.method === 'GET' && asset.assetId) {
+          if (!assets) throw new TypeError('An asset service is required.')
+          const draft = await assets.getDraft({ userId: user.id, siteId: asset.siteId, assetId: asset.assetId })
+          const headers = new Headers()
+          headers.set('Content-Type', draft.contentType)
+          headers.set('Cache-Control', 'private, no-store')
+          draft.object.writeHttpMetadata(headers)
+          return new Response(draft.object.body, { headers })
+        }
+        return notFound()
+      }
       const path = sitePath(pathname)
 
       if (pathname === '/v1/sites') {

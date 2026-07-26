@@ -176,18 +176,19 @@ export function createD1Store({ db } = {}) {
       return { slug: site.slug }
     },
 
-    async delete({ userId, siteId, confirmationName }) {
+    async delete({ userId, siteId, confirmationName, assetsAlreadyDeleted = false }) {
       const current = await get({ userId, siteId })
       if (!current) return { code: 'not-found' }
       if (current.name !== confirmationName) return { code: 'name-mismatch' }
-      await db.batch([
+      const statements = [
         db.prepare('DELETE FROM published_sites WHERE site_id = ?1').bind(siteId),
-        db.prepare('DELETE FROM site_assets WHERE site_id = ?1 AND owner_id = ?2').bind(siteId, userId),
         db.prepare('DELETE FROM analytics_summary WHERE site_id = ?1').bind(siteId),
         db.prepare('DELETE FROM analytics_days WHERE site_id = ?1').bind(siteId),
         db.prepare('DELETE FROM analytics_events WHERE site_id = ?1').bind(siteId),
         db.prepare('DELETE FROM mini_sites WHERE id = ?1 AND owner_id = ?2').bind(siteId, userId),
-      ])
+      ]
+      if (!assetsAlreadyDeleted) statements.splice(1, 0, db.prepare('DELETE FROM site_assets WHERE site_id = ?1 AND owner_id = ?2').bind(siteId, userId))
+      await db.batch(statements)
       return { deleted: true }
     },
 

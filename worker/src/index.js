@@ -8,7 +8,8 @@ import { ApiError, errorResponse } from './http/errors.js'
 import { requireUser } from './auth/session.js'
 import { createD1Store } from './sites/d1Store.js'
 import { createMiniSiteService } from './sites/service.js'
-import { createSiteRoutes, requiresJsonSiteBody } from './sites/routes.js'
+import { createSiteRoutes, requiresJsonSiteBody, requiresMultipartAssetUpload } from './sites/routes.js'
+import { createAssetService } from './assets/service.js'
 
 const consentVersion = '2026-07-26'
 const protectedAuthRoutes = new Map([
@@ -43,6 +44,10 @@ function isUnsafeMethod(method) {
 
 function isJsonContentType(request) {
   return /^application\/json(?:\s*;|$)/i.test(request.headers.get('Content-Type') ?? '')
+}
+
+function isMultipartContentType(request) {
+  return /^multipart\/form-data\s*;/i.test(request.headers.get('Content-Type') ?? '')
 }
 
 async function requestBody(request) {
@@ -259,12 +264,17 @@ export function createWorker(dependencies = {}) {
           if (requiresJsonSiteBody(request) && !isJsonContentType(request)) {
             return withCors(request, errorResponse(new ApiError('unsupported_media_type', 'Use application/json for this request.', 415)), env)
           }
+          if (requiresMultipartAssetUpload(request) && !isMultipartContentType(request)) {
+            return withCors(request, errorResponse(new ApiError('unsupported_media_type', 'Use multipart/form-data with a file field.', 415)), env)
+          }
           const auth = createAuth(env, { email: dependencies.email })
           const store = createD1Store({ db: env.DB })
+          const assets = createAssetService({ bucket: env.MEDIA, db: env.DB, publicOrigin: env.PUBLIC_SITE_ORIGIN })
           const routes = createSiteRoutes({
             auth,
             store,
-            service: createMiniSiteService({ store }),
+            assets,
+            service: createMiniSiteService({ store, assets }),
             requireUser: dependencies.requireUser ?? requireUser,
           })
           return withCors(request, await routes.handle(request), env)
