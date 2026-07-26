@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useAuth } from './auth/authContext.js'
 import App from './App.jsx'
+import ThemeProvider from './theme/ThemeProvider.jsx'
 
 vi.mock('./auth/authContext.js', () => ({
   useAuth: vi.fn(),
@@ -23,7 +24,9 @@ function renderAt(path, registry) {
 
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <App registry={registry} />
+      <ThemeProvider>
+        <App registry={registry} />
+      </ThemeProvider>
     </MemoryRouter>,
   )
 }
