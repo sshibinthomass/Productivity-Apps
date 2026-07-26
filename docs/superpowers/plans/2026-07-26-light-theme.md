@@ -37,7 +37,6 @@
 - Modify `src/main.jsx`: install the provider.
 - Modify `src/styles/global.css`: semantic theme roles and responsive switch styling.
 - Modify `src/apps/multi-link-opener/MultiLinkOpenerPage.css`: consume semantic roles.
-- Create `src/styles/themeStyles.test.js`: guard both theme token sets and component adoption.
 - Modify `index.html`: use the light browser theme color before JavaScript loads.
 
 ### Task 1: Safe Theme Utility
@@ -465,7 +464,6 @@ git commit -m "feat: add accessible theme switch"
 
 **Files:**
 
-- Create: `src/styles/themeStyles.test.js`
 - Modify: `src/styles/global.css`
 - Modify: `src/apps/multi-link-opener/MultiLinkOpenerPage.css`
 - Modify: `index.html`
@@ -475,47 +473,13 @@ git commit -m "feat: add accessible theme switch"
 - Consumes: root `data-theme` from Task 1.
 - Produces: semantic CSS roles shared by global and tool-specific surfaces.
 
-- [ ] **Step 1: Write the failing style contract**
+- [ ] **Step 1: Capture the current dark-mode visual baseline**
 
-```js
-import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+Open the home page and Multi Link Opener in the running browser before changing
+CSS. Record desktop screenshots so the existing dark palette can be compared
+after semantic token migration.
 
-const globalCss = readFileSync(
-  new URL('./global.css', import.meta.url),
-  'utf8',
-)
-const toolCss = readFileSync(
-  new URL('../apps/multi-link-opener/MultiLinkOpenerPage.css', import.meta.url),
-  'utf8',
-)
-
-describe('theme style contract', () => {
-  it('defines light and dark semantic theme roles', () => {
-    expect(globalCss).toContain(':root[data-theme="light"]')
-    expect(globalCss).toContain(':root[data-theme="dark"]')
-    expect(globalCss).toContain('--theme-canvas:')
-    expect(globalCss).toContain('--theme-text-primary:')
-    expect(globalCss).toContain('--theme-surface:')
-    expect(globalCss).toContain('--theme-border:')
-  })
-
-  it('uses semantic roles in both global and tool surfaces', () => {
-    expect(globalCss).toContain('background: var(--theme-canvas)')
-    expect(globalCss).toContain('color: var(--theme-text-primary)')
-    expect(toolCss).toContain('background: var(--theme-form-surface)')
-    expect(toolCss).toContain('color: var(--theme-text-primary)')
-  })
-})
-```
-
-- [ ] **Step 2: Run the style contract and verify RED**
-
-Run: `npm.cmd test -- src/styles/themeStyles.test.js --run`
-
-Expected: FAIL because semantic roles and light/dark selector blocks do not exist.
-
-- [ ] **Step 3: Define semantic role values**
+- [ ] **Step 2: Define semantic role values**
 
 Add these values after the existing brand tokens:
 
@@ -642,16 +606,23 @@ Add the control styling:
 
 Change the initial `meta[name="theme-color"]` in `index.html` to `#F4FBFA`.
 
-- [ ] **Step 4: Run style and component tests**
+- [ ] **Step 3: Run theme behavior and component tests**
 
-Run: `npm.cmd test -- src/styles/themeStyles.test.js src/components/ThemeToggle.test.jsx src/components/Layout.test.jsx --run`
+Run: `npm.cmd test -- src/theme/theme.test.js src/theme/ThemeProvider.test.jsx src/components/ThemeToggle.test.jsx src/components/Layout.test.jsx --run`
 
-Expected: style contract, switch, and layout tests PASS.
+Expected: theme utility, provider, switch, and layout tests PASS.
+
+- [ ] **Step 4: Verify rendered styles in both modes**
+
+In the running browser, verify `data-theme`, `color-scheme`, theme-color
+metadata, page background, primary text, card surface, card border, workbench
+form surface, and guide surface in light and dark modes. Compare the dark
+desktop view with the baseline from Step 1.
 
 - [ ] **Step 5: Commit the dual-theme styling**
 
 ```powershell
-git add src/styles/global.css src/styles/themeStyles.test.js src/apps/multi-link-opener/MultiLinkOpenerPage.css index.html
+git add src/styles/global.css src/apps/multi-link-opener/MultiLinkOpenerPage.css index.html
 git commit -m "feat: add Arvenilo light theme"
 ```
 
