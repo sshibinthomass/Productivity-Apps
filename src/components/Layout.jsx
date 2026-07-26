@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import AuthControls from './AuthControls.jsx'
 import BrandLogo from './BrandLogo.jsx'
+import ThemeToggle from './ThemeToggle.jsx'
 
 export default function Layout({ children }) {
   const location = useLocation()
@@ -21,6 +22,7 @@ export default function Layout({ children }) {
               <span aria-hidden="true">←</span> Network index
             </Link>
           )}
+          <ThemeToggle />
           <AuthControls />
         </nav>
       </header>

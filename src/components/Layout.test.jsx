@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { AuthContext } from '../auth/authContext.js'
+import { ThemeContext } from '../theme/themeContext.js'
 import Layout from './Layout.jsx'
 
 const signedOutAuth = {
@@ -15,11 +16,15 @@ const signedOutAuth = {
 function renderLayout(path) {
   return renderToStaticMarkup(
     <MemoryRouter initialEntries={[path]}>
-      <AuthContext.Provider value={signedOutAuth}>
-        <Layout>
-          <p>Page content</p>
-        </Layout>
-      </AuthContext.Provider>
+      <ThemeContext.Provider
+        value={{ theme: 'light', toggleTheme: vi.fn() }}
+      >
+        <AuthContext.Provider value={signedOutAuth}>
+          <Layout>
+            <p>Page content</p>
+          </Layout>
+        </AuthContext.Provider>
+      </ThemeContext.Provider>
     </MemoryRouter>,
   )
 }
@@ -39,5 +44,14 @@ describe('Layout', () => {
 
     expect(markup).toContain('href="/"')
     expect(markup).toContain('Network index')
+  })
+
+  it('offers the theme switch on every route', () => {
+    expect(renderLayout('/')).toContain(
+      'aria-label="Switch to dark mode"',
+    )
+    expect(renderLayout('/multi-link-opener')).toContain(
+      'aria-label="Switch to dark mode"',
+    )
   })
 })
