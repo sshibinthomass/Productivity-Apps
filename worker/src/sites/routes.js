@@ -99,6 +99,7 @@ export function createSiteRoutes({ auth, store, assets, service = createMiniSite
           const headers = new Headers()
           headers.set('Content-Type', draft.contentType)
           headers.set('Cache-Control', 'private, no-store')
+          headers.set('X-Content-Type-Options', 'nosniff')
           draft.object.writeHttpMetadata(headers)
           return new Response(draft.object.body, { headers })
         }

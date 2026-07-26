@@ -98,9 +98,14 @@ function sanitizeTheme(value = {}) {
   }
 }
 
-function sanitizeSeo(value) {
+function sanitizeDraftSeo(value) {
   const seo = optionalRecord(value, 'The draft contains invalid SEO data.')
   return { title: String(seo.title ?? '').slice(0, 80), description: String(seo.description ?? '').slice(0, 180), socialImagePath: typeof seo.socialImagePath === 'string' ? seo.socialImagePath : null }
+}
+
+function sanitizeSnapshotSeo(value) {
+  const seo = optionalRecord(value, 'The draft contains invalid SEO data.')
+  return { title: String(seo.title ?? '').slice(0, 80), description: String(seo.description ?? '').slice(0, 180), socialImageUrl: typeof seo.socialImageUrl === 'string' ? seo.socialImageUrl : null }
 }
 
 export function parseDraftForSave(value = {}) {
@@ -118,7 +123,7 @@ export function parseDraftForSave(value = {}) {
     if (block.type === 'socials') content.links = Array.isArray(content.links) ? content.links.slice(0, 12) : []
     return { id, type: block.type, visible: block.visible !== false, content }
   })
-  return { name: parseName(value.name), templateId, blocks: normalizedBlocks, theme: sanitizeTheme(value.theme), seo: sanitizeSeo(value.seo) }
+  return { name: parseName(value.name), templateId, blocks: normalizedBlocks, theme: sanitizeTheme(value.theme), seo: sanitizeDraftSeo(value.seo) }
 }
 
 export function parseEventInput(value = {}) {
@@ -163,7 +168,7 @@ export function validatePublishableDraft(draft) {
 
 export function sanitizeSnapshot(draft) {
   draft = requireRecord(draft)
-  return { schemaVersion: 1, siteId: String(draft.siteId ?? ''), slug: parseSlug(draft.slug), revision: Number.isInteger(draft.draftRevision) ? draft.draftRevision : 0, blocks: Array.isArray(draft.blocks) ? draft.blocks.map(sanitizeBlock).filter(Boolean).slice(0, 40) : [], theme: sanitizeTheme(draft.theme), seo: sanitizeSeo(draft.seo) }
+  return { schemaVersion: 1, siteId: String(draft.siteId ?? ''), slug: parseSlug(draft.slug), revision: Number.isInteger(draft.draftRevision) ? draft.draftRevision : 0, blocks: Array.isArray(draft.blocks) ? draft.blocks.map(sanitizeBlock).filter(Boolean).slice(0, 40) : [], theme: sanitizeTheme(draft.theme), seo: sanitizeSnapshotSeo(draft.seo) }
 }
 
 export function createInitialDraft({ siteId, name, slug, templateId, now }) {

@@ -56,12 +56,18 @@ export function createMiniSiteService({ store, assets, createId = () => crypto.r
     async publishMiniSite({ userId, data }) {
       userId = requireUserId(userId); const siteId = parseSiteId(data?.siteId); const draft = await store.get({ userId, siteId }); if (!draft) throwStoreError({ code: 'not-found' }); validatePublishableDraft(draft)
       const promotion = promotionService.promoteReferenced ? await promotionService.promoteReferenced({ userId, siteId, draft, attemptId: createId() }) : promotionService.promoteAssets ? await promotionService.promoteAssets({ userId, siteId, draft, attemptId: createId() }) : { draft, publicPaths: [] }
-      try { return throwStoreError(await store.publish({ userId, siteId, snapshot: sanitizeSnapshot(promotion.draft), expectedRevision: draft.draftRevision ?? 0, now: now() })) }
-      catch (error) {
+      const cleanupPromotion = async () => {
         if (promotion.publicPaths.length > 0) {
           const cleanup = promotionService.cleanupObsolete ?? promotionService.cleanupPromotedAssets
           if (cleanup) await cleanup.call(promotionService, { publicPaths: promotion.publicPaths })
         }
+      }
+      try {
+        const publication = throwStoreError(await store.publish({ userId, siteId, snapshot: sanitizeSnapshot(promotion.draft), expectedRevision: draft.draftRevision ?? 0, now: now() }))
+        await cleanupPromotion().catch(() => {})
+        return publication
+      } catch (error) {
+        await cleanupPromotion().catch(() => {})
         throw error
       }
     },
@@ -71,9 +77,11 @@ export function createMiniSiteService({ store, assets, createId = () => crypto.r
       const current = await store.get({ userId, siteId })
       if (!current) throwStoreError({ code: 'not-found' })
       if (current.name !== confirmationName) throwStoreError({ code: 'name-mismatch' })
-      const assetsAlreadyDeleted = Boolean(promotionService.deleteSiteAssets)
-      if (assetsAlreadyDeleted) await promotionService.deleteSiteAssets({ userId, siteId })
-      return throwStoreError(await store.delete({ userId, siteId, confirmationName, assetsAlreadyDeleted }))
+      const deletion = throwStoreError(await store.delete({ userId, siteId, confirmationName }))
+      if (deletion.deleted && promotionService.deleteSiteAssets) {
+        await promotionService.deleteSiteAssets({ siteId, assetKeys: deletion.assetKeys ?? [] }).catch(() => {})
+      }
+      return { deleted: true }
     },
     async recordMiniSiteEvent({ data }) { const input = parseEventInput(data); return throwStoreError(await store.recordEvent({ ...input, receiptId: await eventReceiptId(input), now: now() })) },
   }

@@ -109,12 +109,12 @@ describe('mini-site domain validation', () => {
         { id: 'social-1', type: 'socials', visible: true, content: { links: [{ network: 'site', label: 'Site', url: 'javascript:alert(1)' }, { network: 'web', label: 'Web', url: 'https://example.com' }] } },
       ],
       theme: { background: { type: 'solid', value: '#ffffff' }, colors: { text: '#000000' }, injected: 'remove' },
-      seo: { title: 'Maya Studio', description: 'Selected work', socialImagePath: null, secret: 'remove' }, ownerEmail: 'private@example.com',
+      seo: { title: 'Maya Studio', description: 'Selected work', socialImageUrl: 'https://links.shibinthomas.com/assets/site-1/3/asset-1', secret: 'remove' }, ownerEmail: 'private@example.com',
     })
     expect(snapshot).toMatchObject({ schemaVersion: 1, siteId: 'site-1', slug: 'maya-studio', revision: 3, blocks: [
       { id: 'link-1', type: 'link', visible: true, content: { label: 'Portfolio', url: 'https://example.com/' } },
       { id: 'social-1', type: 'socials', content: { links: [{ network: 'web', label: 'Web', url: 'https://example.com/' }] } },
-    ], theme: { background: { type: 'solid', value: '#ffffff', secondary: '#ffffff', imageUrl: '' }, colors: { text: '#000000' } }, seo: { title: 'Maya Studio', description: 'Selected work', socialImagePath: null } })
+    ], theme: { background: { type: 'solid', value: '#ffffff', secondary: '#ffffff', imageUrl: '' }, colors: { text: '#000000' } }, seo: { title: 'Maya Studio', description: 'Selected work', socialImageUrl: 'https://links.shibinthomas.com/assets/site-1/3/asset-1' } })
     expect(snapshot.ownerEmail).toBeUndefined()
     expect(snapshot.theme.injected).toBeUndefined()
   })

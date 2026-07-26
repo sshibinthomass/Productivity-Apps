@@ -11,11 +11,69 @@ function hasPrefix(bytes, prefix) {
   return prefix.every((byte, index) => bytes[index] === byte)
 }
 
+function readU32BE(bytes, offset) { return ((bytes[offset] << 24) >>> 0) + (bytes[offset + 1] << 16) + (bytes[offset + 2] << 8) + bytes[offset + 3] }
+function readU32LE(bytes, offset) { return bytes[offset] + (bytes[offset + 1] << 8) + (bytes[offset + 2] << 16) + ((bytes[offset + 3] << 24) >>> 0) }
+
+function validPng(bytes) {
+  if (!hasPrefix(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return false
+  let offset = 8; let first = true
+  while (offset + 12 <= bytes.length) {
+    const length = readU32BE(bytes, offset); const type = String.fromCharCode(...bytes.slice(offset + 4, offset + 8)); const end = offset + 12 + length
+    if (end > bytes.length) return false
+    if (first && (type !== 'IHDR' || length !== 13)) return false
+    if (type === 'IEND') return length === 0 && end === bytes.length
+    first = false; offset = end
+  }
+  return false
+}
+
+function validJpeg(bytes) {
+  if (!hasPrefix(bytes, [0xff, 0xd8])) return false
+  let offset = 2
+  while (offset < bytes.length) {
+    if (bytes[offset++] !== 0xff) return false
+    while (bytes[offset] === 0xff) offset += 1
+    const marker = bytes[offset++]
+    if (marker === 0xd9) return offset === bytes.length
+    if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue
+    if (offset + 2 > bytes.length) return false
+    const length = (bytes[offset] << 8) + bytes[offset + 1]
+    if (length < 2 || offset + length > bytes.length) return false
+    offset += length
+  }
+  return false
+}
+
+function validGif(bytes) {
+  if (!(hasPrefix(bytes, [0x47, 0x49, 0x46, 0x38, 0x37, 0x61]) || hasPrefix(bytes, [0x47, 0x49, 0x46, 0x38, 0x39, 0x61])) || bytes.length < 14) return false
+  let offset = 13
+  if (bytes[10] & 0x80) offset += 3 * (2 ** ((bytes[10] & 7) + 1))
+  while (offset < bytes.length) {
+    const marker = bytes[offset++]
+    if (marker === 0x3b) return offset === bytes.length
+    if (marker === 0x21) { offset += 1 } else if (marker === 0x2c) { offset += 9; if (offset > bytes.length) return false; if (bytes[offset - 1] & 0x80) offset += 3 * (2 ** ((bytes[offset - 1] & 7) + 1)); offset += 1 } else return false
+    while (offset < bytes.length) { const length = bytes[offset++]; if (length === 0) break; offset += length; if (offset > bytes.length) return false }
+  }
+  return false
+}
+
+function validWebp(bytes) {
+  if (!hasPrefix(bytes, [0x52, 0x49, 0x46, 0x46]) || !hasPrefix(bytes.slice(8), [0x57, 0x45, 0x42, 0x50]) || readU32LE(bytes, 4) !== bytes.length - 8) return false
+  let offset = 12; let imageChunk = false
+  while (offset + 8 <= bytes.length) {
+    const type = String.fromCharCode(...bytes.slice(offset, offset + 4)); const length = readU32LE(bytes, offset + 4); const end = offset + 8 + length + (length % 2)
+    if (end > bytes.length) return false
+    if (['VP8 ', 'VP8L', 'VP8X'].includes(type)) imageChunk = true
+    offset = end
+  }
+  return imageChunk && offset === bytes.length
+}
+
 function matchesSignature(contentType, bytes) {
-  if (contentType === 'image/png') return hasPrefix(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
-  if (contentType === 'image/jpeg') return hasPrefix(bytes, [0xff, 0xd8, 0xff])
-  if (contentType === 'image/gif') return hasPrefix(bytes, [0x47, 0x49, 0x46, 0x38]) && (bytes[4] === 0x37 || bytes[4] === 0x39) && bytes[5] === 0x61
-  return hasPrefix(bytes, [0x52, 0x49, 0x46, 0x46]) && hasPrefix(bytes.slice(8), [0x57, 0x45, 0x42, 0x50])
+  if (contentType === 'image/png') return validPng(bytes)
+  if (contentType === 'image/jpeg') return validJpeg(bytes)
+  if (contentType === 'image/gif') return validGif(bytes)
+  return validWebp(bytes)
 }
 
 function publicUrl(publicOrigin, siteId, revision, assetId) {
@@ -76,7 +134,7 @@ export function createAssetService({ bucket, db, publicOrigin, createId = () => 
     return bucket.get(`public/${siteId}/${revision}/${assetId}`)
   }
 
-  async function promoteReferenced({ userId, siteId, draft } = {}) {
+  async function promoteReferenced({ userId, siteId, draft, attemptId } = {}) {
     await ownedSite(userId, siteId)
     const revision = draft?.draftRevision
     if (!Number.isInteger(revision) || revision < 1) throw assetError('The draft revision is invalid.')
@@ -85,18 +143,22 @@ export function createAssetService({ bucket, db, publicOrigin, createId = () => 
     const byKey = new Map(results.map((asset) => [asset.object_key, asset]))
     const promoted = new Map()
     const publicPaths = []
+    const attempt = typeof attemptId === 'string' && attemptId ? attemptId : createId()
 
     async function promote(path) {
       const asset = byKey.get(path)
       if (!asset) throw assetError('The draft references an unavailable image.')
       if (promoted.has(path)) return promoted.get(path)
       const targetKey = `public/${siteId}/${revision}/${asset.id}`
+      const stagingKey = `staging/${siteId}/${revision}/${attempt}/${asset.id}`
       const existing = await bucket.head(targetKey)
       if (!existing) {
         const source = await bucket.get(asset.object_key)
         if (!source) throw assetError('The draft references an unavailable image.')
-        await bucket.put(targetKey, source.body, { httpMetadata: { contentType: asset.content_type, contentDisposition: contentDisposition(asset.id) } })
-        publicPaths.push(targetKey)
+        await bucket.put(stagingKey, source.body, { httpMetadata: { contentType: asset.content_type, contentDisposition: contentDisposition(asset.id) } })
+        const staged = await bucket.get(stagingKey)
+        await bucket.put(targetKey, staged.body, { httpMetadata: { contentType: asset.content_type, contentDisposition: contentDisposition(asset.id) } })
+        publicPaths.push(stagingKey)
       }
       const url = publicUrl(publicOrigin, siteId, revision, asset.id)
       promoted.set(path, url)
@@ -107,19 +169,21 @@ export function createAssetService({ bucket, db, publicOrigin, createId = () => 
     try {
       for (const block of nextDraft.blocks ?? []) {
         if (!block?.content || typeof block.content !== 'object') continue
-        if (typeof block.content.storagePath === 'string' && block.content.storagePath) {
+        if (block.visible === false || !['image', 'profile'].includes(block.type)) continue
+        if (block.type === 'image' && typeof block.content.storagePath === 'string' && block.content.storagePath) {
           const url = await promote(block.content.storagePath)
           block.content.storagePath = url
           block.content.url = url
         }
-        if (typeof block.content.avatarStoragePath === 'string' && block.content.avatarStoragePath) {
+        if (block.type === 'profile' && typeof block.content.avatarStoragePath === 'string' && block.content.avatarStoragePath) {
           const url = await promote(block.content.avatarStoragePath)
           block.content.avatarStoragePath = url
           block.content.avatarUrl = url
         }
       }
       if (typeof nextDraft.seo?.socialImagePath === 'string' && nextDraft.seo.socialImagePath) {
-        nextDraft.seo.socialImagePath = await promote(nextDraft.seo.socialImagePath)
+        nextDraft.seo.socialImageUrl = await promote(nextDraft.seo.socialImagePath)
+        delete nextDraft.seo.socialImagePath
       }
       return { draft: nextDraft, publicPaths }
     } catch (error) {
@@ -132,12 +196,14 @@ export function createAssetService({ bucket, db, publicOrigin, createId = () => 
     await Promise.all(publicPaths.map((key) => bucket.delete(key)))
   }
 
-  async function deleteSiteAssets({ userId, siteId } = {}) {
-    await ownedSite(userId, siteId)
-    const { results } = await db.prepare('SELECT object_key FROM site_assets WHERE site_id = ?1 AND owner_id = ?2').bind(siteId, userId).all()
-    const publicObjects = await bucket.list({ prefix: `public/${siteId}/` })
-    await Promise.all([...results.map(({ object_key: key }) => bucket.delete(key)), ...publicObjects.objects.map(({ key }) => bucket.delete(key))])
-    await db.prepare('DELETE FROM site_assets WHERE site_id = ?1 AND owner_id = ?2').bind(siteId, userId).run()
+  async function deleteSiteAssets({ siteId, assetKeys = [] } = {}) {
+    const publicKeys = []
+    let cursor
+    do {
+      const page = await bucket.list({ prefix: `public/${siteId}/`, ...(cursor ? { cursor } : {}) })
+      publicKeys.push(...page.objects.map(({ key }) => key)); cursor = page.truncated ? page.cursor : undefined
+    } while (cursor)
+    await Promise.all([...assetKeys, ...publicKeys].map((key) => bucket.delete(key)))
   }
 
   return { uploadDraft, getDraft, getPublic, promoteReferenced, deleteSiteAssets, cleanupObsolete }

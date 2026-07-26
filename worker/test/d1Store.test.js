@@ -90,7 +90,7 @@ describe('D1 mini-site store', () => {
 
   it('changes the published site slug atomically while preserving its snapshot', async () => {
     await create(store)
-    const snapshot = { schemaVersion: 1, siteId: 'site-1', slug: 'maya-studio', revision: 1, blocks: [], theme: {}, seo: {} }
+    const snapshot = { schemaVersion: 1, siteId: 'site-1', slug: 'maya-studio', revision: 1, blocks: [], theme: {}, seo: { socialImageUrl: 'https://links.shibinthomas.com/assets/site-1/1/asset-1' } }
     await store.publish({ userId: 'user-1', siteId: 'site-1', snapshot, expectedRevision: 1, now })
 
     await expect(store.changeSlug({ userId: 'user-1', siteId: 'site-1', slug: 'maya-works' })).resolves.toMatchObject({ slug: 'maya-works', status: 'published' })
@@ -99,9 +99,10 @@ describe('D1 mini-site store', () => {
 
   it('publishes and unpublishes site state and snapshot together', async () => {
     await create(store)
-    const snapshot = { schemaVersion: 1, siteId: 'site-1', slug: 'maya-studio', revision: 1, blocks: [], theme: {}, seo: {} }
+    const snapshot = { schemaVersion: 1, siteId: 'site-1', slug: 'maya-studio', revision: 1, blocks: [], theme: {}, seo: { socialImageUrl: 'https://links.shibinthomas.com/assets/site-1/1/asset-1' } }
 
     await expect(store.publish({ userId: 'user-1', siteId: 'site-1', snapshot, expectedRevision: 1, now })).resolves.toEqual({ slug: 'maya-studio', revision: 1 })
+    await expect(env.DB.prepare('SELECT social_image_url FROM published_sites WHERE site_id = ?').bind('site-1').first()).resolves.toEqual({ social_image_url: 'https://links.shibinthomas.com/assets/site-1/1/asset-1' })
     await expect(store.unpublish({ userId: 'user-1', siteId: 'site-1', now })).resolves.toEqual({ slug: 'maya-studio' })
     await expect(env.DB.prepare('SELECT * FROM published_sites WHERE site_id = ?').bind('site-1').first()).resolves.toBeNull()
     await expect(store.get({ userId: 'user-1', siteId: 'site-1' })).resolves.toMatchObject({ status: 'draft', publishedRevision: 1 })

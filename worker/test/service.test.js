@@ -103,6 +103,21 @@ describe('mini-site lifecycle service', () => {
     await expect(service.deleteMiniSite({ userId: 'user-1', data: { siteId: 'site-1', confirmationName: 'Wrong' } })).rejects.toMatchObject({ code: 'name_mismatch' })
   })
 
+  it('does not clean R2 assets when the authoritative site delete fails or loses a rename race', async () => {
+    const draft = makeDraft(); let cleanups = 0
+    const assets = { async deleteSiteAssets() { cleanups += 1 } }
+    const failed = createMiniSiteService({ store: {
+      async get() { return draft }, async delete() { throw new Error('D1 unavailable') },
+    }, assets })
+    await expect(failed.deleteMiniSite({ userId: 'user-1', data: { siteId: 'site-1', confirmationName: 'Maya Studio' } })).rejects.toThrow('D1 unavailable')
+    expect(cleanups).toBe(0)
+    const raced = createMiniSiteService({ store: {
+      async get() { return draft }, async delete() { return { code: 'name-mismatch' } },
+    }, assets })
+    await expect(raced.deleteMiniSite({ userId: 'user-1', data: { siteId: 'site-1', confirmationName: 'Maya Studio' } })).rejects.toMatchObject({ code: 'name_mismatch' })
+    expect(cleanups).toBe(0)
+  })
+
   it('records valid public events once and rejects unknown links', async () => {
     const store = createStore(); store.published.set('maya-studio', { blocks: [{ id: 'link-1', type: 'link', visible: true }, { id: 'socials-1', type: 'socials', visible: true }] }); const service = createMiniSiteService({ store })
     const data = { slug: 'maya-studio', type: 'link_click', blockId: 'link-1', eventId: 'event-12345678' }
