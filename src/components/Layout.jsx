@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import AuthControls from './AuthControls.jsx'
+import BrandLogo from './BrandLogo.jsx'
 
 export default function Layout({ children }) {
   const location = useLocation()
@@ -8,11 +9,8 @@ export default function Layout({ children }) {
   return (
     <div className="site-shell">
       <header className="site-header">
-        <Link className="product-mark" to="/" aria-label="Productivity Apps home">
-          <span className="product-mark__symbol" aria-hidden="true">
-            P/
-          </span>
-          <span>Productivity Apps</span>
+        <Link className="product-mark" to="/" aria-label="Arvenilo Network home">
+          <BrandLogo />
         </Link>
         <nav
           className="site-header__actions"
@@ -20,7 +18,7 @@ export default function Layout({ children }) {
         >
           {!isHome && (
             <Link className="all-apps-link" to="/">
-              <span aria-hidden="true">←</span> All apps
+              <span aria-hidden="true">←</span> Network index
             </Link>
           )}
           <AuthControls />
@@ -28,8 +26,8 @@ export default function Layout({ children }) {
       </header>
       <main className="site-main">{children}</main>
       <footer className="site-footer">
-        <p>Small tools. Less friction.</p>
-        <p>Built for focused work.</p>
+        <p>Where Intelligence Meets Reality.</p>
+        <p>Arvenilo Network</p>
       </footer>
     </div>
   )
