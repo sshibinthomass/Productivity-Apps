@@ -22,7 +22,7 @@ describe('mini-site model', () => {
     })
 
     expect(SITE_LIMIT).toBe(5)
-    expect(BLOCK_LIMIT).toBe(40)
+    expect(BLOCK_LIMIT).toBe(25)
     expect(LINK_BLOCK_LIMIT).toBe(25)
     expect(BLOCK_TYPES).toEqual([
       'profile',
@@ -119,6 +119,6 @@ describe('mini-site model', () => {
     ]
 
     expect(duplicateBlock(links, links[0].id)).toBe(links)
-    expect(duplicateBlock(full, full[30].id)).toBe(full)
+    expect(duplicateBlock(full, full.at(-1).id)).toBe(full)
   })
 })

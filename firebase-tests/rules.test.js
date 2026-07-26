@@ -103,6 +103,24 @@ describe('Firestore mini-site rules', () => {
     )
   })
 
+  it('enforces the 25-block server boundary on draft updates', async () => {
+    const db = testEnv.authenticatedContext('user-1').firestore()
+    const blocks = Array.from({ length: 26 }, (_, index) => ({
+      id: `link-${index}`,
+      type: 'link',
+      visible: true,
+      content: { label: `Link ${index}`, url: 'https://example.com' },
+    }))
+
+    await assertFails(
+      db.doc('users/user-1/sites/site-1').update({
+        blocks,
+        draftRevision: 1,
+        updatedAt: 'next',
+      }),
+    )
+  })
+
   it('allows exact public reads but denies listing and writes', async () => {
     const publicDb = testEnv.unauthenticatedContext().firestore()
 

@@ -62,6 +62,29 @@ export default function MiniSitesDashboardPage() {
     }
   }, [deleteTarget, duplicateTarget])
 
+  const handleDialogKeyDown = (event, close) => {
+    if (event.key === 'Escape') {
+      close()
+      return
+    }
+    if (event.key !== 'Tab') return
+
+    const focusable = Array.from(
+      dialogRef.current?.querySelectorAll(
+        'input:not([disabled]), button:not([disabled]), [href]',
+      ) ?? [],
+    )
+    const first = focusable[0]
+    const last = focusable.at(-1)
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last?.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first?.focus()
+    }
+  }
+
   const loadSites = useCallback(async () => {
     try {
       const sites = await repository.listSites(user.uid)
@@ -243,9 +266,9 @@ export default function MiniSitesDashboardPage() {
           <div
             className="mini-dialog__panel"
             ref={dialogRef}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') setDeleteTarget(null)
-            }}
+            onKeyDown={(event) =>
+              handleDialogKeyDown(event, () => setDeleteTarget(null))
+            }
           >
             <h2 id="delete-title">Delete {deleteTarget.name}?</h2>
             <p>This removes the draft, published page, assets, and analytics.</p>
@@ -279,9 +302,12 @@ export default function MiniSitesDashboardPage() {
             className="mini-dialog__panel"
             ref={dialogRef}
             onSubmit={duplicateSite}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') setDuplicateTarget(null)
-            }}
+            onKeyDown={(event) =>
+              handleDialogKeyDown(
+                event,
+                () => setDuplicateTarget(null),
+              )
+            }
           >
             <h2 id="duplicate-title">Duplicate {duplicateTarget.name}</h2>
             <label>

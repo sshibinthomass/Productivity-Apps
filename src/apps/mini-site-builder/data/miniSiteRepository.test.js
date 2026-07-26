@@ -88,13 +88,21 @@ function createFakeSdk() {
 describe('mini-site repository', () => {
   it('loads owner drafts and exact public snapshots', async () => {
     const sdk = createFakeSdk()
+    sdk.documents.set(
+      'users/user-1/sites/site-1/analytics/summary',
+      { totalViews: 12, totalClicks: 5 },
+    )
     const repository = createMiniSiteRepository(
       { db: {}, storage: {}, functions: {} },
       sdk,
     )
 
     await expect(repository.listSites('user-1')).resolves.toMatchObject([
-      { id: 'site-1', name: 'Maya Studio' },
+      {
+        id: 'site-1',
+        name: 'Maya Studio',
+        analytics: { totalViews: 12, totalClicks: 5 },
+      },
     ])
     await expect(repository.getDraft('user-1', 'site-1')).resolves.toMatchObject(
       { name: 'Maya Studio', draftRevision: 2 },

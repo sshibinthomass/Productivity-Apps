@@ -254,6 +254,35 @@ describe('MiniSiteStudioPage', () => {
     )
   })
 
+  it('publishes newer draft revisions without taking the live page offline', async () => {
+    const draft = {
+      ...buildPublishableDraft(),
+      status: 'published',
+      draftRevision: 3,
+      publishedRevision: 2,
+    }
+    const repository = {
+      publishSite: vi.fn().mockResolvedValue({ revision: 3 }),
+    }
+    renderStudio(repository, draft)
+    await screen.findByText('Maya Studio')
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Settings' }))
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Publish changes' }),
+    )
+
+    await waitFor(() =>
+      expect(repository.publishSite).toHaveBeenCalledWith('site-1'),
+    )
+    expect(
+      screen.queryByRole('button', { name: 'Publish changes' }),
+    ).toBeNull()
+    expect(
+      screen.getByRole('button', { name: 'Unpublish site' }),
+    ).toBeTruthy()
+  })
+
   it('blocks publishing until visible content passes validation', async () => {
     const repository = { publishSite: vi.fn() }
     renderStudio(repository)

@@ -14,6 +14,7 @@ export default function SettingsPanel({
   draft,
   slug,
   status,
+  hasUnpublishedChanges,
   busy,
   errors,
   actionError,
@@ -112,6 +113,16 @@ export default function SettingsPanel({
               <Link to={`/s/${slug}`} target="_blank" rel="noreferrer">
                 View public site
               </Link>
+              {hasUnpublishedChanges && (
+                <button
+                  type="button"
+                  className="button button-primary"
+                  onClick={onPublish}
+                  disabled={busy}
+                >
+                  Publish changes
+                </button>
+              )}
               <button
                 type="button"
                 className="button button-secondary"

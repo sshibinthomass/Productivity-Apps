@@ -23,7 +23,7 @@ service cloud.firestore {
         && request.resource.data.name.size() > 0
         && request.resource.data.name.size() <= 80
         && request.resource.data.blocks is list
-        && request.resource.data.blocks.size() <= 40
+        && request.resource.data.blocks.size() <= 25
         && request.resource.data.theme is map
         && request.resource.data.seo is map
         && request.resource.data.draftRevision is int

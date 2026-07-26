@@ -75,10 +75,33 @@ export function createMiniSiteRepository(client, sdk = firebaseSdk) {
         sdk.orderBy('updatedAt', 'desc'),
       )
       const snapshot = await sdk.getDocs(sitesQuery)
-      return snapshot.docs.map((item) => ({
-        id: item.id,
-        ...normalizeDraft(item.data()),
-      }))
+      return Promise.all(
+        snapshot.docs.map(async (item) => {
+          const summarySnapshot = await sdk.getDoc(
+            sdk.doc(
+              db,
+              'users',
+              uid,
+              'sites',
+              item.id,
+              'analytics',
+              'summary',
+            ),
+          )
+          const analytics = documentData(summarySnapshot, {
+            totalViews: 0,
+            totalClicks: 0,
+          })
+          return {
+            id: item.id,
+            ...normalizeDraft(item.data()),
+            analytics: {
+              totalViews: analytics.totalViews ?? 0,
+              totalClicks: analytics.totalClicks ?? 0,
+            },
+          }
+        }),
+      )
     },
 
     async getDraft(uid, siteId) {

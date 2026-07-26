@@ -98,9 +98,17 @@ describe('MiniSitesDashboardPage', () => {
       name: 'Delete permanently',
     })
     expect(confirmButton.disabled).toBe(true)
-    fireEvent.change(screen.getByLabelText('Type Maya Studio to confirm'), {
+    const confirmationInput = screen.getByLabelText(
+      'Type Maya Studio to confirm',
+    )
+    fireEvent.change(confirmationInput, {
       target: { value: 'Maya Studio' },
     })
+    confirmButton.focus()
+    fireEvent.keyDown(confirmButton, { key: 'Tab' })
+    expect(document.activeElement).toBe(confirmationInput)
+    fireEvent.keyDown(confirmationInput, { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(confirmButton)
     fireEvent.click(confirmButton)
 
     await waitFor(() => {

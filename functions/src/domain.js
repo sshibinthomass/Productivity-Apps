@@ -54,6 +54,146 @@ const DEFAULT_THEME = {
   profile: { shape: 'circle', size: 'medium' },
 }
 
+function profileBlock(displayName, bio) {
+  return {
+    type: 'profile',
+    visible: true,
+    content: { avatarUrl: '', displayName, bio, alt: '' },
+  }
+}
+
+function linkBlock(label) {
+  return {
+    type: 'link',
+    visible: true,
+    content: {
+      label,
+      url: '',
+      supportingText: '',
+      icon: '',
+    },
+  }
+}
+
+function createTemplatePreset(templateId, name) {
+  const creatorTheme = {
+    ...structuredClone(DEFAULT_THEME),
+    background: {
+      type: 'gradient',
+      value: '#e9e5ff',
+      secondary: '#d8f8f2',
+      imageUrl: '',
+    },
+  }
+  const presets = {
+    creator: {
+      theme: creatorTheme,
+      blocks: [
+        profileBlock(name, 'Creator, maker, and curious human.'),
+        linkBlock('My latest work'),
+        linkBlock('Say hello'),
+      ],
+    },
+    portfolio: {
+      theme: {
+        ...structuredClone(DEFAULT_THEME),
+        background: {
+          type: 'solid',
+          value: '#f4fbfa',
+          secondary: '#f4fbfa',
+          imageUrl: '',
+        },
+        colors: {
+          text: '#081d21',
+          muted: '#4d6265',
+          button: '#ffffff',
+          buttonText: '#081d21',
+          buttonBorder: '#9bb5b2',
+        },
+        layout: {
+          alignment: 'left',
+          width: 'wide',
+          density: 'spacious',
+        },
+        button: { style: 'outline', radius: 8, shadow: 'none' },
+      },
+      blocks: [
+        profileBlock(name, 'Selected work and useful links.'),
+        {
+          type: 'heading',
+          visible: true,
+          content: { text: 'Selected work', level: 2 },
+        },
+        linkBlock('View project'),
+      ],
+    },
+    minimal: {
+      theme: {
+        ...structuredClone(DEFAULT_THEME),
+        colors: {
+          text: '#162326',
+          muted: '#667477',
+          button: '#ffffff',
+          buttonText: '#162326',
+          buttonBorder: '#cad6d4',
+        },
+        layout: {
+          alignment: 'center',
+          width: 'narrow',
+          density: 'compact',
+        },
+        button: { style: 'outline', radius: 999, shadow: 'none' },
+      },
+      blocks: [
+        profileBlock(name, 'A short introduction goes here.'),
+        linkBlock('Featured link'),
+      ],
+    },
+    bold: {
+      theme: {
+        ...structuredClone(DEFAULT_THEME),
+        background: {
+          type: 'solid',
+          value: '#171033',
+          secondary: '#171033',
+          imageUrl: '',
+        },
+        colors: {
+          text: '#ffffff',
+          muted: '#c9c1ed',
+          button: '#f4b942',
+          buttonText: '#171033',
+          buttonBorder: '#f4b942',
+        },
+        layout: {
+          alignment: 'left',
+          width: 'wide',
+          density: 'comfortable',
+        },
+        button: { style: 'solid', radius: 2, shadow: 'strong' },
+        profile: { shape: 'square', size: 'large' },
+      },
+      blocks: [
+        profileBlock(name, 'Put the strongest idea first.'),
+        linkBlock('Explore the work'),
+      ],
+    },
+    blank: {
+      theme: {
+        ...structuredClone(DEFAULT_THEME),
+        background: {
+          type: 'solid',
+          value: '#f4fbfa',
+          secondary: '#f4fbfa',
+          imageUrl: '',
+        },
+      },
+      blocks: [profileBlock(name, ''), linkBlock('')],
+    },
+  }
+  return structuredClone(presets[templateId] ?? presets.blank)
+}
+
 export function functionError(code, message) {
   const error = new Error(message)
   error.code = code
@@ -217,6 +357,15 @@ export function validatePublishableDraft(draft) {
       'Add at least one visible block before publishing.',
     )
   }
+  if (
+    visibleBlocks.length > 25 ||
+    visibleBlocks.filter(({ type }) => type === 'link').length > 25
+  ) {
+    throw functionError(
+      'invalid-argument',
+      'A mini-site may contain up to 25 blocks.',
+    )
+  }
 
   for (const block of visibleBlocks) {
     if (
@@ -253,7 +402,7 @@ export function sanitizeSnapshot(draft) {
       ? draft.draftRevision
       : 0,
     blocks: Array.isArray(draft.blocks)
-      ? draft.blocks.map(sanitizeBlock).filter(Boolean).slice(0, 40)
+      ? draft.blocks.map(sanitizeBlock).filter(Boolean).slice(0, 25)
       : [],
     theme: sanitizeTheme(draft.theme),
     seo: {
@@ -274,37 +423,18 @@ export function createInitialDraft({
   templateId,
   now,
 }) {
+  const preset = createTemplatePreset(templateId, name)
   return {
     siteId,
     name,
     slug,
     templateId,
     status: 'draft',
-    blocks: [
-      {
-        id: `${siteId}-profile`,
-        type: 'profile',
-        visible: true,
-        content: {
-          avatarUrl: '',
-          displayName: name,
-          bio: '',
-          alt: '',
-        },
-      },
-      {
-        id: `${siteId}-link`,
-        type: 'link',
-        visible: true,
-        content: {
-          label: '',
-          url: '',
-          supportingText: '',
-          icon: '',
-        },
-      },
-    ],
-    theme: structuredClone(DEFAULT_THEME),
+    blocks: preset.blocks.map((block, index) => ({
+      ...block,
+      id: `${siteId}-${block.type}-${index + 1}`,
+    })),
+    theme: preset.theme,
     seo: { title: name, description: '', socialImagePath: null },
     draftRevision: 0,
     publishedRevision: 0,

@@ -40,6 +40,7 @@ describe('Firestore store asset boundary', () => {
 
     expect(getBucket).not.toHaveBeenCalled()
     const draft = await store.promoteAssets({
+      uid: 'user-1',
       siteId: 'site-1',
       draft: {
         draftRevision: 3,
@@ -61,5 +62,37 @@ describe('Firestore store asset boundary', () => {
     expect(draft.blocks[0].content.url).toBe(
       'https://firebasestorage.googleapis.com/v0/b/example.firebasestorage.app/o/mini-site-public%2Fsite-1%2F3%2Fimage-1.webp?alt=media',
     )
+  })
+
+  it('rejects draft assets owned by another user or site', async () => {
+    const bucket = {
+      name: 'example.firebasestorage.app',
+      file: vi.fn(),
+    }
+    const store = createFirestoreStore({
+      db: {},
+      getBucket: () => bucket,
+      FieldValue: {},
+      Timestamp: {},
+    })
+
+    await expect(
+      store.promoteAssets({
+        uid: 'user-1',
+        siteId: 'site-1',
+        draft: {
+          blocks: [
+            {
+              type: 'image',
+              content: {
+                storagePath:
+                  'mini-site-drafts/user-2/site-9/private.webp',
+              },
+            },
+          ],
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'invalid-argument' })
+    expect(bucket.file).not.toHaveBeenCalled()
   })
 })

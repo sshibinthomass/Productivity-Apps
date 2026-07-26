@@ -30,6 +30,10 @@ function throwStoreError(result) {
       'invalid-argument',
       'That link is not part of the published site.',
     ],
+    'revision-conflict': [
+      'aborted',
+      'The draft changed while publishing. Try publishing again.',
+    ],
   }
   if (result?.code && errors[result.code]) {
     throw functionError(...errors[result.code])
@@ -102,6 +106,7 @@ export function createMiniSiteService({
           uid,
           siteId,
           snapshot: sanitizeSnapshot(publishableDraft),
+          expectedRevision: draft.draftRevision ?? 0,
           now: now(),
         }),
       )

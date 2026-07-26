@@ -65,9 +65,12 @@ function createMemoryStore({ siteCount = 0 } = {}) {
       slugs.set(slug, { uid, siteId })
       return structuredClone(site)
     },
-    async publish({ uid, siteId, snapshot }) {
+    async publish({ uid, siteId, snapshot, expectedRevision }) {
       const site = sites.get(`${uid}/${siteId}`)
       if (!site) return { code: 'not-found' }
+      if (site.draftRevision !== expectedRevision) {
+        return { code: 'revision-conflict' }
+      }
       site.status = 'published'
       site.publishedRevision = site.draftRevision
       published.set(site.slug, structuredClone(snapshot))
@@ -97,7 +100,9 @@ function createMemoryStore({ siteCount = 0 } = {}) {
       if (
         type === 'link_click' &&
         !snapshot.blocks.some(
-          (block) => block.id === blockId && block.type === 'link',
+          (block) =>
+            block.id === blockId &&
+            ['link', 'socials'].includes(block.type),
         )
       ) {
         return { code: 'unknown-link' }
@@ -140,6 +145,35 @@ describe('mini-site lifecycle service', () => {
         },
       }),
     ).rejects.toMatchObject({ code: 'resource-exhausted' })
+  })
+
+  it('creates meaningfully different drafts from selected templates', async () => {
+    const store = createMemoryStore()
+    let nextId = 0
+    const service = createMiniSiteService({
+      store,
+      createId: () => `site-${++nextId}`,
+    })
+
+    const creator = await service.createMiniSite({
+      auth: { uid: 'user-1' },
+      data: {
+        name: 'Creator page',
+        slug: 'creator-page',
+        templateId: 'creator',
+      },
+    })
+    const bold = await service.createMiniSite({
+      auth: { uid: 'user-1' },
+      data: {
+        name: 'Bold page',
+        slug: 'bold-page',
+        templateId: 'bold',
+      },
+    })
+
+    expect(creator.theme).not.toEqual(bold.theme)
+    expect(creator.blocks).not.toEqual(bold.blocks)
   })
 
   it('changes slugs, publishes sanitized snapshots, and unpublishes', async () => {
@@ -238,6 +272,47 @@ describe('mini-site lifecycle service', () => {
     expect(store.published.size).toBe(0)
   })
 
+  it('rejects drafts beyond the server-enforced block limit', async () => {
+    const store = createMemoryStore()
+    store.sites.set(
+      'user-1/site-1',
+      makeDraft({
+        blocks: Array.from({ length: 26 }, (_, index) => ({
+          id: `link-${index}`,
+          type: 'link',
+          visible: true,
+          content: {
+            label: `Link ${index}`,
+            url: 'https://example.com',
+          },
+        })),
+      }),
+    )
+    const service = createMiniSiteService({ store })
+
+    await expect(
+      service.publishMiniSite({
+        auth: { uid: 'user-1' },
+        data: { siteId: 'site-1' },
+      }),
+    ).rejects.toMatchObject({ code: 'invalid-argument' })
+  })
+
+  it('rejects a publish when the stored draft revision changes', async () => {
+    const store = createMemoryStore()
+    const draft = makeDraft()
+    store.sites.set('user-1/site-1', draft)
+    store.publish = async () => ({ code: 'revision-conflict' })
+    const service = createMiniSiteService({ store })
+
+    await expect(
+      service.publishMiniSite({
+        auth: { uid: 'user-1' },
+        data: { siteId: 'site-1' },
+      }),
+    ).rejects.toMatchObject({ code: 'aborted' })
+  })
+
   it('requires ownership and exact confirmation before deletion', async () => {
     const store = createMemoryStore()
     store.sites.set('user-1/site-1', makeDraft())
@@ -287,5 +362,25 @@ describe('mini-site lifecycle service', () => {
         data: { ...input.data, blockId: 'missing', eventId: 'event-abcdefgh' },
       }),
     ).rejects.toMatchObject({ code: 'invalid-argument' })
+  })
+
+  it('accepts click events for a published socials block', async () => {
+    const store = createMemoryStore()
+    store.published.set('maya-studio', {
+      blocks: [{ id: 'socials-1', type: 'socials', visible: true }],
+    })
+    const service = createMiniSiteService({ store })
+
+    await expect(
+      service.recordMiniSiteEvent({
+        auth: null,
+        data: {
+          slug: 'maya-studio',
+          type: 'link_click',
+          blockId: 'socials-1',
+          eventId: 'social-event-123456',
+        },
+      }),
+    ).resolves.toEqual({ recorded: true })
   })
 })

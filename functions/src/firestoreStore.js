@@ -109,11 +109,12 @@ export function createFirestoreStore({
       })
     },
 
-    async promoteAssets({ siteId, draft }) {
+    async promoteAssets({ uid, siteId, draft }) {
       const bucket = getBucket()
       const revision = draft.draftRevision ?? 0
       const nextDraft = structuredClone(draft)
       const copies = []
+      const allowedPrefix = `mini-site-drafts/${uid}/${siteId}/`
 
       for (const block of nextDraft.blocks ?? []) {
         const storagePath =
@@ -123,6 +124,13 @@ export function createFirestoreStore({
               ? block.content?.avatarStoragePath
               : null
         if (!storagePath?.startsWith('mini-site-drafts/')) continue
+        if (!storagePath.startsWith(allowedPrefix)) {
+          const error = new Error(
+            'Draft assets must belong to this mini-site.',
+          )
+          error.code = 'invalid-argument'
+          throw error
+        }
         const filename = storagePath.split('/').at(-1)
         const publicPath = `mini-site-public/${siteId}/${revision}/${filename}`
         copies.push(bucket.file(storagePath).copy(bucket.file(publicPath)))
@@ -136,12 +144,15 @@ export function createFirestoreStore({
       return nextDraft
     },
 
-    async publish({ uid, siteId, snapshot }) {
+    async publish({ uid, siteId, snapshot, expectedRevision }) {
       return db.runTransaction(async (transaction) => {
         const siteRef = db.doc(sitePath(uid, siteId))
         const siteSnapshot = await transaction.get(siteRef)
         if (!siteSnapshot.exists) return { code: 'not-found' }
         const site = siteSnapshot.data()
+        if ((site.draftRevision ?? 0) !== expectedRevision) {
+          return { code: 'revision-conflict' }
+        }
         transaction.set(db.doc(publishedPath(site.slug)), {
           ...snapshot,
           slug: site.slug,
@@ -221,7 +232,7 @@ export function createFirestoreStore({
           !published.blocks?.some(
             (block) =>
               block.id === blockId &&
-              block.type === 'link' &&
+              ['link', 'socials'].includes(block.type) &&
               block.visible !== false,
           )
         ) {

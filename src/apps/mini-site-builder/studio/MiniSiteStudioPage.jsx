@@ -92,6 +92,9 @@ function StudioWorkspace({
   const [addOpen, setAddOpen] = useState(false)
   const [siteSlug, setSiteSlug] = useState(initialDraft.slug)
   const [siteStatus, setSiteStatus] = useState(initialDraft.status)
+  const [sitePublishedRevision, setSitePublishedRevision] = useState(
+    initialDraft.publishedRevision,
+  )
   const [uploadState, setUploadState] = useState({
     status: 'idle',
     error: null,
@@ -248,8 +251,11 @@ function StudioWorkspace({
     setPublishState({ busy: true, errors: {}, actionError: null })
     try {
       await autosave.flush()
-      await repository.publishSite(siteId)
+      const result = await repository.publishSite(siteId)
       setSiteStatus('published')
+      setSitePublishedRevision(
+        result?.revision ?? autosave.revision,
+      )
       setPublishState({ busy: false, errors: {}, actionError: null })
     } catch (error) {
       setPublishState({
@@ -370,6 +376,11 @@ function StudioWorkspace({
               draft={history.present}
               slug={siteSlug}
               status={siteStatus}
+              hasUnpublishedChanges={
+                siteStatus === 'published' &&
+                (autosave.status !== 'saved' ||
+                  autosave.revision > sitePublishedRevision)
+              }
               busy={publishState.busy}
               errors={publishState.errors}
               actionError={publishState.actionError}
