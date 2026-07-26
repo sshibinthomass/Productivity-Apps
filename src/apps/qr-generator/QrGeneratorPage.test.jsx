@@ -54,6 +54,64 @@ afterEach(() => {
 })
 
 describe('QrGeneratorPage content flow', () => {
+  it('shows one builder panel at a time while keeping the preview available', () => {
+    renderPage()
+
+    const buildTab = screen.getByRole('tab', { name: /Build QR/ })
+    const designTab = screen.getByRole('tab', { name: /Design/ })
+    const buildPanel = screen.getByRole('tabpanel', { name: /Build QR/ })
+
+    expect(buildTab.getAttribute('aria-selected')).toBe('true')
+    expect(buildPanel.hidden).toBe(false)
+    expect(
+      screen.getByRole('complementary', {
+        name: 'QR preview and export',
+      }),
+    ).toBeTruthy()
+
+    fireEvent.click(designTab)
+
+    const designPanel = screen.getByRole('tabpanel', { name: /Design/ })
+    expect(designPanel.hidden).toBe(false)
+    expect(document.getElementById('qr-panel-build').hidden).toBe(true)
+    expect(
+      screen.getByRole('complementary', {
+        name: 'QR preview and export',
+      }),
+    ).toBeTruthy()
+  })
+
+  it('preserves content and design values while switching tabs', () => {
+    renderPage()
+
+    fireEvent.change(screen.getByLabelText('Website URL'), {
+      target: { value: 'https://arvenilo.com/tabs' },
+    })
+    fireEvent.click(screen.getByRole('tab', { name: /Design/ }))
+    fireEvent.change(screen.getByLabelText('Module color value'), {
+      target: { value: '#123456' },
+    })
+    fireEvent.click(screen.getByRole('tab', { name: /Build QR/ }))
+
+    expect(screen.getByLabelText('Website URL').value).toBe(
+      'https://arvenilo.com/tabs',
+    )
+
+    fireEvent.click(screen.getByRole('tab', { name: /Design/ }))
+    expect(screen.getByLabelText('Module color value').value).toBe('#123456')
+  })
+
+  it('keeps the current tab selected when the QR data is reset', () => {
+    renderPage()
+    const designTab = screen.getByRole('tab', { name: /Design/ })
+
+    fireEvent.click(designTab)
+    fireEvent.click(screen.getByRole('button', { name: 'Reset all' }))
+
+    expect(designTab.getAttribute('aria-selected')).toBe('true')
+    expect(document.getElementById('qr-panel-design').hidden).toBe(false)
+  })
+
   it('starts with the guided URL template and a local-only empty preview', () => {
     const { createQrCode } = renderPage()
 
@@ -165,6 +223,7 @@ describe('QrGeneratorPage design and output flow', () => {
       target: { value: 'https://arvenilo.com' },
     })
     await waitFor(() => expect(renderer.append).toHaveBeenCalled())
+    fireEvent.click(screen.getByRole('tab', { name: /Design/ }))
 
     fireEvent.change(screen.getByLabelText('Module color value'), {
       target: { value: '#888888' },
@@ -197,6 +256,7 @@ describe('QrGeneratorPage design and output flow', () => {
     fireEvent.change(screen.getByLabelText('Website URL'), {
       target: { value: 'https://arvenilo.com' },
     })
+    fireEvent.click(screen.getByRole('tab', { name: /Design/ }))
     const file = new File(['logo'], 'mark.png', { type: 'image/png' })
     fireEvent.change(screen.getByLabelText('Center logo'), {
       target: { files: [file] },
@@ -205,6 +265,10 @@ describe('QrGeneratorPage design and output flow', () => {
     await waitFor(() => expect(processLogo).toHaveBeenCalledWith(file))
     expect(screen.getByText('mark.png')).toBeTruthy()
     expect(screen.getByLabelText('Error correction').value).toBe('H')
+
+    fireEvent.click(screen.getByRole('tab', { name: /Build QR/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /Design/ }))
+    expect(screen.getByText('mark.png')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove logo' }))
     expect(screen.queryByText('mark.png')).toBeNull()
@@ -217,6 +281,7 @@ describe('QrGeneratorPage design and output flow', () => {
     fireEvent.change(screen.getByLabelText('Website URL'), {
       target: { value: 'https://arvenilo.com' },
     })
+    fireEvent.click(screen.getByRole('tab', { name: /Design/ }))
     fireEvent.change(screen.getByLabelText('Center logo'), {
       target: {
         files: [new File(['logo'], 'mark.png', { type: 'image/png' })],

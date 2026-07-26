@@ -1,5 +1,6 @@
 import QRCodeStyling from 'qr-code-styling'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import QrBuilderTabs from './QrBuilderTabs.jsx'
 import QrContentForm from './QrContentForm.jsx'
 import QrDesignControls from './QrDesignControls.jsx'
 import QrPreview from './QrPreview.jsx'
@@ -32,6 +33,7 @@ export default function QrGeneratorPage({
   createClipboardItem = defaultClipboardItem,
   printPage = defaultPrint,
 }) {
+  const [activeTab, setActiveTab] = useState('build')
   const [selectedType, setSelectedType] = useState('url')
   const [valuesByType, setValuesByType] = useState(createInitialValues)
   const [attemptedTypes, setAttemptedTypes] = useState({})
@@ -240,7 +242,15 @@ export default function QrGeneratorPage({
 
       <div className="qr-studio">
         <section className="qr-builder" aria-label="QR content and design">
-          <div className="qr-panel qr-panel--build">
+          <QrBuilderTabs activeTab={activeTab} onChange={setActiveTab} />
+
+          <div
+            aria-labelledby="qr-tab-build"
+            className="qr-panel qr-panel--build"
+            hidden={activeTab !== 'build'}
+            id="qr-panel-build"
+            role="tabpanel"
+          >
             <div className="qr-panel__heading">
               <span>Build</span>
               <div>
@@ -261,14 +271,20 @@ export default function QrGeneratorPage({
             />
           </div>
 
-          <details className="qr-panel qr-panel--design">
-            <summary>
+          <div
+            aria-labelledby="qr-tab-design"
+            className="qr-panel qr-panel--design"
+            hidden={activeTab !== 'design'}
+            id="qr-panel-design"
+            role="tabpanel"
+          >
+            <div className="qr-panel__heading">
               <span>Design</span>
               <div>
                 <p className="eyebrow">Make it yours</p>
                 <h2>Style and scan settings</h2>
               </div>
-            </summary>
+            </div>
             <QrDesignControls
               design={design}
               logoError={logoError}
@@ -277,7 +293,7 @@ export default function QrGeneratorPage({
               onLogo={handleLogo}
               onRemoveLogo={removeLogo}
             />
-          </details>
+          </div>
         </section>
 
         <aside className="qr-proof" aria-label="QR preview and export">
