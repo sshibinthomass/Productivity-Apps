@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import QrContentForm from './QrContentForm.jsx'
 import QrDesignControls from './QrDesignControls.jsx'
 import QrPreview from './QrPreview.jsx'
+import QrTypePicker from './QrTypePicker.jsx'
 import { createExportFilename, processLogoFile } from './qrMedia.js'
 import {
   QR_TYPES,
@@ -19,22 +20,6 @@ import './QrGeneratorPage.css'
 const defaultQrFactory = (options) => new QRCodeStyling(options)
 const defaultPrint = () => window.print()
 const defaultClipboardItem = (items) => new ClipboardItem(items)
-
-function groupedTypes() {
-  return QR_TYPES.reduce((groups, type) => {
-    const group = groups.find(({ category }) => category === type.category)
-
-    if (group) {
-      group.types.push(type)
-    } else {
-      groups.push({ category: type.category, types: [type] })
-    }
-
-    return groups
-  }, [])
-}
-
-const TYPE_GROUPS = groupedTypes()
 
 function currentTypeMeta(type) {
   return QR_TYPES.find(({ id }) => id === type) ?? QR_TYPES[0]
@@ -103,6 +88,12 @@ export default function QrGeneratorPage({
     document.addEventListener('keydown', closeOnEscape)
     return () => document.removeEventListener('keydown', closeOnEscape)
   }, [isFullScreen])
+
+  function handleTypeChange(type) {
+    setSelectedType(type)
+    setFeedback('')
+    setPreviewError('')
+  }
 
   function handleFieldChange(field, value) {
     setValuesByType((current) => ({
@@ -249,50 +240,19 @@ export default function QrGeneratorPage({
 
       <div className="qr-studio">
         <section className="qr-builder" aria-label="QR content and design">
-          <div className="qr-panel qr-panel--types">
+          <div className="qr-panel qr-panel--build">
             <div className="qr-panel__heading">
-              <span>Content</span>
+              <span>Build</span>
               <div>
-                <p className="eyebrow">Choose what the code does</p>
-                <h2>Start with a purpose</h2>
+                <p className="eyebrow">Content and details</p>
+                <h2>Build your QR</h2>
+                <p>Start with a quick pick or choose any supported QR type.</p>
               </div>
             </div>
-            <div className="qr-type-groups">
-              {TYPE_GROUPS.map((group) => (
-                <section key={group.category}>
-                  <h3>{group.category}</h3>
-                  <div className="qr-type-grid">
-                    {group.types.map((type) => (
-                      <button
-                        aria-pressed={selectedType === type.id}
-                        className="qr-type-button"
-                        key={type.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedType(type.id)
-                          setFeedback('')
-                          setPreviewError('')
-                        }}
-                      >
-                        <span>{type.label}</span>
-                        <small>{type.description}</small>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          </div>
-
-          <div className="qr-panel qr-panel--content">
-            <div className="qr-panel__heading">
-              <span>Details</span>
-              <div>
-                <p className="eyebrow">{typeMeta.category}</p>
-                <h2>{typeMeta.label}</h2>
-                <p>{typeMeta.description}</p>
-              </div>
-            </div>
+            <QrTypePicker
+              onChange={handleTypeChange}
+              selectedType={selectedType}
+            />
             <QrContentForm
               errors={errors}
               onChange={handleFieldChange}

@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import QrGeneratorPage from './QrGeneratorPage.jsx'
 
@@ -88,29 +94,35 @@ describe('QrGeneratorPage content flow', () => {
     )
   })
 
-  it('shows contextual fields and restores values when switching types', () => {
+  it('preserves values while switching through quick picks and all types', () => {
     renderPage()
 
     fireEvent.change(screen.getByLabelText('Website URL'), {
       target: { value: 'https://arvenilo.com' },
     })
-    fireEvent.click(screen.getByRole('button', { name: /Wi-Fi/ }))
-    expect(screen.getByLabelText('Network name (SSID)')).toBeTruthy()
-    fireEvent.change(screen.getByLabelText('Network name (SSID)'), {
-      target: { value: 'Arvenilo Studio' },
+
+    fireEvent.change(screen.getByLabelText('All QR types'), {
+      target: { value: 'event' },
+    })
+    expect(screen.getByLabelText('Event title')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('Event title'), {
+      target: { value: 'Studio launch' },
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /Contact card/ }))
-    expect(screen.getByLabelText('First name')).toBeTruthy()
-
-    fireEvent.click(screen.getByRole('button', { name: /Wi-Fi/ }))
-    expect(screen.getByLabelText('Network name (SSID)').value).toBe(
-      'Arvenilo Studio',
-    )
     fireEvent.click(screen.getByRole('button', { name: /Website URL/ }))
     expect(screen.getByLabelText('Website URL').value).toBe(
       'https://arvenilo.com',
     )
+
+    fireEvent.change(screen.getByLabelText('All QR types'), {
+      target: { value: 'event' },
+    })
+    expect(screen.getByLabelText('Event title').value).toBe('Studio launch')
+    expect(
+      within(screen.getByRole('group', { name: 'Quick picks' }))
+        .getAllByRole('button')
+        .every((button) => button.getAttribute('aria-pressed') === 'false'),
+    ).toBe(true)
   })
 
   it('shows actionable validation without rendering invalid content', () => {
