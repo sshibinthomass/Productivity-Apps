@@ -251,14 +251,7 @@ export default function QrGeneratorPage({
             id="qr-panel-build"
             role="tabpanel"
           >
-            <div className="qr-panel__heading">
-              <span>Build</span>
-              <div>
-                <p className="eyebrow">Content and details</p>
-                <h2>Build your QR</h2>
-                <p>Start with a quick pick or choose any supported QR type.</p>
-              </div>
-            </div>
+            <h2 className="qr-panel__title">Build your QR</h2>
             <QrTypePicker
               onChange={handleTypeChange}
               selectedType={selectedType}
@@ -278,13 +271,7 @@ export default function QrGeneratorPage({
             id="qr-panel-design"
             role="tabpanel"
           >
-            <div className="qr-panel__heading">
-              <span>Design</span>
-              <div>
-                <p className="eyebrow">Make it yours</p>
-                <h2>Style and scan settings</h2>
-              </div>
-            </div>
+            <h2 className="qr-panel__title">Style and scan settings</h2>
             <QrDesignControls
               design={design}
               logoError={logoError}
