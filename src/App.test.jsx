@@ -49,6 +49,16 @@ describe('App authentication routes', () => {
     ).toBeNull()
   })
 
+  it('keeps JSON Formatter public for a signed-out user', () => {
+    renderAt('/json-formatter')
+
+    expect(screen.getByLabelText('Input JSON')).toBeTruthy()
+    expect(screen.getByLabelText('Formatted JSON')).toBeTruthy()
+    expect(
+      screen.queryByRole('button', { name: 'Continue with Google' }),
+    ).toBeNull()
+  })
+
   it('applies the protected-route boundary to opted-in registry apps', () => {
     const PrivateFixture = () => <p>Private fixture app</p>
     const protectedRegistry = [

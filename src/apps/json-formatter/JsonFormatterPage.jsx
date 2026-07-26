@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { JSON_SAMPLE, parseJson, repairJson } from './jsonUtils.js'
+import './JsonFormatterPage.css'
 
 function documentStats(text) {
   if (!text) {

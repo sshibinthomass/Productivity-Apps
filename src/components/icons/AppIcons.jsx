@@ -52,3 +52,20 @@ export function NotesIcon({ size = 24 }) {
     </IconFrame>
   )
 }
+
+export function JsonIcon({ size = 24 }) {
+  return (
+    <IconFrame size={size}>
+      <path
+        d="M9 4.5H7.75A1.75 1.75 0 0 0 6 6.25V9c0 1.15-.55 2-1.5 2.35v1.3C5.45 13 6 13.85 6 15v2.75a1.75 1.75 0 0 0 1.75 1.75H9M15 4.5h1.25A1.75 1.75 0 0 1 18 6.25V9c0 1.15.55 2 1.5 2.35v1.3C18.55 13 18 13.85 18 15v2.75a1.75 1.75 0 0 1-1.75 1.75H15"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <circle cx="9.5" cy="12" fill="currentColor" r="0.8" />
+      <circle cx="12" cy="12" fill="currentColor" r="0.8" />
+      <circle cx="14.5" cy="12" fill="currentColor" r="0.8" />
+    </IconFrame>
+  )
+}
