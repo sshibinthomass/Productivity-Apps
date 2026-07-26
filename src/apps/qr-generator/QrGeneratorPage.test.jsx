@@ -63,6 +63,7 @@ describe('QrGeneratorPage content flow', () => {
 
     expect(buildTab.getAttribute('aria-selected')).toBe('true')
     expect(buildPanel.hidden).toBe(false)
+    expect(document.getElementById('qr-panel-design').hidden).toBe(true)
     expect(
       screen.getByRole('complementary', {
         name: 'QR preview and export',
