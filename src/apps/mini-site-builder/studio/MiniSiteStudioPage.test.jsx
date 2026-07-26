@@ -315,4 +315,57 @@ describe('MiniSiteStudioPage', () => {
       'https://storage.example/avatar.png',
     )
   })
+
+  it('shows owner analytics with daily activity and per-link clicks', async () => {
+    const draft = buildPublishableDraft()
+    const firstLink = draft.blocks.find(({ type }) => type === 'link')
+    const repository = {
+      getAnalytics: vi.fn().mockResolvedValue({
+        summary: {
+          totalViews: 120,
+          totalClicks: 36,
+          linkClicks: { [firstLink.id]: 28 },
+        },
+        days: [
+          { date: '2026-07-25', views: 45, clicks: 12 },
+          { date: '2026-07-26', views: 75, clicks: 24 },
+        ],
+        linkClicks: { [firstLink.id]: 28 },
+      }),
+    }
+    renderStudio(repository, draft)
+    await screen.findByText('Maya Studio')
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Analytics' }))
+
+    expect(await screen.findByText('120')).toBeTruthy()
+    expect(screen.getByText('36')).toBeTruthy()
+    expect(screen.getByText('30.0%')).toBeTruthy()
+    expect(screen.getByLabelText('Views over time')).toBeTruthy()
+    expect(screen.getAllByText('My latest work').length).toBeGreaterThan(1)
+    expect(screen.getByText('28 clicks')).toBeTruthy()
+    expect(repository.getAnalytics).toHaveBeenCalledWith('user-1', 'site-1')
+  })
+
+  it('keeps analytics loading errors recoverable', async () => {
+    const repository = {
+      getAnalytics: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('Analytics unavailable'))
+        .mockResolvedValueOnce({
+          summary: { totalViews: 0, totalClicks: 0, linkClicks: {} },
+          days: [],
+          linkClicks: {},
+        }),
+    }
+    renderStudio(repository)
+    await screen.findByText('Maya Studio')
+    fireEvent.click(screen.getByRole('tab', { name: 'Analytics' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Analytics unavailable',
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Try analytics again' }))
+    expect(await screen.findByText('No activity yet')).toBeTruthy()
+  })
 })

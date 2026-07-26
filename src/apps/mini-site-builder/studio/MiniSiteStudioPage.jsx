@@ -26,6 +26,7 @@ import BlockList from './BlockList.jsx'
 import ContentPanel from './ContentPanel.jsx'
 import DesignPanel from './DesignPanel.jsx'
 import SettingsPanel from './SettingsPanel.jsx'
+import AnalyticsPanel from './AnalyticsPanel.jsx'
 import StudioHeader from './StudioHeader.jsx'
 import { useDraftAutosave } from './useDraftAutosave.js'
 
@@ -369,6 +370,13 @@ function StudioWorkspace({ initialDraft, repository, siteId, uid }) {
               onChangeSlug={changeSlug}
               onPublish={publish}
               onUnpublish={unpublish}
+            />
+          ) : section === 'Analytics' ? (
+            <AnalyticsPanel
+              repository={repository}
+              uid={uid}
+              siteId={siteId}
+              blocks={blocks}
             />
           ) : (
             <SectionPlaceholder section={section} />
