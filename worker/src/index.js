@@ -5,6 +5,10 @@ import { verifyTurnstile } from './auth/turnstile.js'
 import { validateEnv } from './env.js'
 import { isAllowedOrigin, withCors } from './http/cors.js'
 import { ApiError, errorResponse } from './http/errors.js'
+import { requireUser } from './auth/session.js'
+import { createD1Store } from './sites/d1Store.js'
+import { createMiniSiteService } from './sites/service.js'
+import { createSiteRoutes } from './sites/routes.js'
 
 const consentVersion = '2026-07-26'
 const protectedAuthRoutes = new Map([
@@ -238,6 +242,18 @@ export function createWorker(dependencies = {}) {
               emailVerified: session.user.emailVerified,
             } : null,
           }), env)
+        }
+
+        if (pathname === '/v1/sites' || pathname.startsWith('/v1/sites/')) {
+          const auth = createAuth(env, { email: dependencies.email })
+          const store = createD1Store({ db: env.DB })
+          const routes = createSiteRoutes({
+            auth,
+            store,
+            service: createMiniSiteService({ store }),
+            requireUser: dependencies.requireUser ?? requireUser,
+          })
+          return withCors(request, await routes.handle(request), env)
         }
 
         if (pathname === '/v1/health') {

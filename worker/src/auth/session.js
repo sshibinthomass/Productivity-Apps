@@ -7,7 +7,7 @@ export async function getSession(auth, request) {
 export async function requireUser(auth, request) {
   const session = await getSession(auth, request)
   if (!session) {
-    throw new ApiError('unauthorized', 'Sign in is required.', 401)
+    throw new ApiError('unauthenticated', 'Sign in is required.', 401)
   }
 
   return { id: session.user.id, email: session.user.email }
