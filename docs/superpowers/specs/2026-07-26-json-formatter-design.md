@@ -107,4 +107,3 @@ Component tests cover:
 - clearing and sample loading
 
 The final verification runs the focused tests, the full test suite, lint, and the production build.
-

@@ -477,4 +477,3 @@ Expected: no whitespace errors. Confirm no unrelated files, especially `Arvenilo
 git add src/apps/json-formatter src/components/icons/AppIcons.jsx src/config/appRegistry.jsx src/config/appRegistry.test.jsx src/App.test.jsx
 git commit -m "fix: finalize json formatter verification"
 ```
-
