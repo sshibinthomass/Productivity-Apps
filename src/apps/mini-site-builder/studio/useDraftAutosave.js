@@ -65,12 +65,12 @@ export function useDraftAutosave({
     return () => window.clearTimeout(timer)
   }, [delay, draft, enabled, performSave, savedDraft])
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
       mountedRef.current = false
-    },
-    [],
-  )
+    }
+  }, [])
 
   const retry = useCallback(
     () => performSave(draft).catch(() => undefined),

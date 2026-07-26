@@ -1,5 +1,27 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createFirestoreStore } from './firestoreStore.js'
+import {
+  createFirestoreStore,
+  createAnalyticsUpdates,
+} from './firestoreStore.js'
+
+describe('Firestore analytics updates', () => {
+  it('writes click counts as nested maps for merge-safe per-link totals', () => {
+    const increment = vi.fn((amount) => ({ increment: amount }))
+
+    expect(
+      createAnalyticsUpdates('link_click', 'link-1', { increment }),
+    ).toEqual({
+      summary: {
+        totalClicks: { increment: 1 },
+        linkClicks: { 'link-1': { increment: 1 } },
+      },
+      day: {
+        clicks: { increment: 1 },
+        linkClicks: { 'link-1': { increment: 1 } },
+      },
+    })
+  })
+})
 
 describe('Firestore store asset boundary', () => {
   it('resolves the configured bucket only when publishing an asset', async () => {

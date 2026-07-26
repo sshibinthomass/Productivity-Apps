@@ -202,4 +202,98 @@ describe('createFirebaseClient', () => {
     expect(client.appCheck).toBeNull()
     expect(client.functions.region).toBe('europe-west1')
   })
+
+  it('enables an explicit App Check debug token only in development', () => {
+    const sdk = {
+      getApps: () => [],
+      initializeApp: (config) => ({ config }),
+      getAuth: () => ({}),
+      getFirestore: () => ({}),
+      getStorage: () => ({}),
+      getFunctions: () => ({}),
+      initializeAppCheck: () => ({}),
+      ReCaptchaEnterpriseProvider: class {},
+      GoogleAuthProvider: class {},
+    }
+    const original = globalThis.FIREBASE_APPCHECK_DEBUG_TOKEN
+
+    try {
+      delete globalThis.FIREBASE_APPCHECK_DEBUG_TOKEN
+      createFirebaseClient(
+        {
+          DEV: true,
+          VITE_FIREBASE_API_KEY: 'key',
+          VITE_FIREBASE_AUTH_DOMAIN: 'example.firebaseapp.com',
+          VITE_FIREBASE_PROJECT_ID: 'example',
+          VITE_FIREBASE_APP_ID: 'app-id',
+          VITE_FIREBASE_STORAGE_BUCKET: 'example.firebasestorage.app',
+          VITE_FIREBASE_APP_CHECK_SITE_KEY: 'enterprise-key',
+          VITE_FIREBASE_APP_CHECK_DEBUG_TOKEN: 'local-debug-token',
+        },
+        sdk,
+      )
+
+      expect(globalThis.FIREBASE_APPCHECK_DEBUG_TOKEN).toBe(
+        'local-debug-token',
+      )
+    } finally {
+      if (original === undefined) {
+        delete globalThis.FIREBASE_APPCHECK_DEBUG_TOKEN
+      } else {
+        globalThis.FIREBASE_APPCHECK_DEBUG_TOKEN = original
+      }
+    }
+  })
+
+  it('connects every browser service to local emulators only when enabled', () => {
+    const connections = []
+    let anonymousSignIn = false
+    const sdk = {
+      getApps: () => [],
+      initializeApp: (config) => ({ config }),
+      getAuth: () => ({ type: 'auth' }),
+      getFirestore: () => ({ type: 'firestore' }),
+      getStorage: () => ({ type: 'storage' }),
+      getFunctions: () => ({ type: 'functions' }),
+      connectAuthEmulator: (service, url, options) =>
+        connections.push(['auth', service, url, options]),
+      connectFirestoreEmulator: (service, host, port) =>
+        connections.push(['firestore', service, host, port]),
+      connectStorageEmulator: (service, host, port) =>
+        connections.push(['storage', service, host, port]),
+      connectFunctionsEmulator: (service, host, port) =>
+        connections.push(['functions', service, host, port]),
+      signInAnonymously: async () => {
+        anonymousSignIn = true
+      },
+      GoogleAuthProvider: class {},
+    }
+
+    createFirebaseClient(
+      {
+        DEV: true,
+        VITE_FIREBASE_USE_EMULATORS: 'true',
+        VITE_FIREBASE_EMULATOR_AUTO_LOGIN: 'true',
+        VITE_FIREBASE_API_KEY: 'key',
+        VITE_FIREBASE_AUTH_DOMAIN: 'example.firebaseapp.com',
+        VITE_FIREBASE_PROJECT_ID: 'demo-mini-sites',
+        VITE_FIREBASE_APP_ID: 'app-id',
+        VITE_FIREBASE_STORAGE_BUCKET: 'demo-mini-sites.firebasestorage.app',
+      },
+      sdk,
+    )
+
+    expect(connections).toEqual([
+      [
+        'auth',
+        { type: 'auth' },
+        'http://127.0.0.1:9099',
+        { disableWarnings: true },
+      ],
+      ['firestore', { type: 'firestore' }, '127.0.0.1', 8080],
+      ['storage', { type: 'storage' }, '127.0.0.1', 9199],
+      ['functions', { type: 'functions' }, '127.0.0.1', 5001],
+    ])
+    expect(anonymousSignIn).toBe(true)
+  })
 })

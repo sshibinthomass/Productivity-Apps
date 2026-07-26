@@ -1,5 +1,9 @@
 const FONT_OPTIONS = ['Sora Variable', 'Inter Variable', 'Georgia', 'Arial']
 
+import { useState } from 'react'
+import { getTemplate } from '../model/templates.js'
+import { contrastRatio } from '../model/validation.js'
+
 function SelectField({ label, value, onChange, children }) {
   return (
     <label className="mini-studio__field">
@@ -15,28 +19,55 @@ function SelectField({ label, value, onChange, children }) {
 }
 
 function ColorField({ label, value, onChange }) {
+  const [draftValue, setDraftValue] = useState(null)
+
+  const updateColor = (nextValue) => {
+    setDraftValue(nextValue)
+    if (/^#[0-9a-f]{6}$/i.test(nextValue)) {
+      onChange(nextValue)
+    }
+  }
+
   return (
-    <label className="mini-design__color">
+    <div className="mini-design__color">
       <span>{label}</span>
       <span>
         <input
-          aria-label={label}
+          aria-label={`${label} color picker`}
           type="color"
           value={value}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(event) => {
+            setDraftValue(null)
+            onChange(event.target.value)
+          }}
         />
-        <code>{value}</code>
+        <input
+          aria-label={label}
+          className="mini-design__hex"
+          value={draftValue ?? value}
+          maxLength="7"
+          onChange={(event) => updateColor(event.target.value)}
+          onBlur={() => setDraftValue(null)}
+        />
       </span>
-    </label>
+    </div>
   )
 }
 
-export default function DesignPanel({ theme, onChange }) {
+export default function DesignPanel({ theme, templateId, onChange }) {
   const update = (group, patch) =>
     onChange({
       ...theme,
       [group]: { ...theme[group], ...patch },
     })
+  const textContrast = contrastRatio(
+    theme.colors.text,
+    theme.background.value,
+  )
+  const buttonContrast = contrastRatio(
+    theme.colors.buttonText,
+    theme.colors.button,
+  )
 
   return (
     <section className="mini-studio__wide-panel">
@@ -44,7 +75,28 @@ export default function DesignPanel({ theme, onChange }) {
         <span>Visual system</span>
         <h2>Design</h2>
         <p>Shape a recognizable page with a restrained set of safe controls.</p>
+        <button
+          type="button"
+          className="text-button"
+          onClick={() =>
+            onChange(structuredClone(getTemplate(templateId).theme))
+          }
+        >
+          Reset to template
+        </button>
       </header>
+
+      {(textContrast < 4.5 || buttonContrast < 4.5) && (
+        <div className="mini-design__warning" role="alert">
+          <strong>Contrast needs attention before publishing.</strong>
+          {textContrast < 4.5 && (
+            <span>Page text: {textContrast.toFixed(1)}:1</span>
+          )}
+          {buttonContrast < 4.5 && (
+            <span>Button text: {buttonContrast.toFixed(1)}:1</span>
+          )}
+        </div>
+      )}
 
       <fieldset>
         <legend>Canvas</legend>

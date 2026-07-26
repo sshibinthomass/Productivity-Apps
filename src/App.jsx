@@ -34,6 +34,14 @@ export default function App({ registry = appRegistry }) {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/mini-sites/:siteId/analytics"
+          element={
+            <ProtectedRoute>
+              <MiniSiteStudioPage initialSection="Analytics" />
+            </ProtectedRoute>
+          }
+        />
         {routableApps.map((app) => {
           const Page = app.component
           const page = <Page />

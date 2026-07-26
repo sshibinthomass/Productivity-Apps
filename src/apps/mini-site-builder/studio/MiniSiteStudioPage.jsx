@@ -72,7 +72,13 @@ function SectionPlaceholder({ section }) {
   )
 }
 
-function StudioWorkspace({ initialDraft, repository, siteId, uid }) {
+function StudioWorkspace({
+  initialDraft,
+  initialSection,
+  repository,
+  siteId,
+  uid,
+}) {
   const [history, dispatch] = useReducer(historyReducer, {
     past: [],
     present: initialDraft,
@@ -81,7 +87,7 @@ function StudioWorkspace({ initialDraft, repository, siteId, uid }) {
   const [selectedId, setSelectedId] = useState(
     initialDraft.blocks[0]?.id ?? null,
   )
-  const [section, setSection] = useState('Content')
+  const [section, setSection] = useState(initialSection)
   const [mobileView, setMobileView] = useState('Edit')
   const [addOpen, setAddOpen] = useState(false)
   const [siteSlug, setSiteSlug] = useState(initialDraft.slug)
@@ -355,6 +361,7 @@ function StudioWorkspace({ initialDraft, repository, siteId, uid }) {
           ) : section === 'Design' ? (
             <DesignPanel
               theme={history.present.theme}
+              templateId={history.present.templateId}
               onChange={(theme) => changeDraft({ theme })}
             />
           ) : section === 'Settings' ? (
@@ -401,7 +408,9 @@ function StudioWorkspace({ initialDraft, repository, siteId, uid }) {
   )
 }
 
-export default function MiniSiteStudioPage() {
+export default function MiniSiteStudioPage({
+  initialSection = 'Content',
+}) {
   const { siteId } = useParams()
   const { user } = useAuth()
   const repository = useMiniSiteRepository()
@@ -473,6 +482,7 @@ export default function MiniSiteStudioPage() {
     <StudioWorkspace
       key={`${siteId}-${loadState.attempt}`}
       initialDraft={loadState.draft}
+      initialSection={initialSection}
       repository={repository}
       siteId={siteId}
       uid={user.uid}

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 
 function SettingsField({ label, children }) {
   return (
@@ -108,9 +109,9 @@ export default function SettingsPanel({
         <div>
           {status === 'published' ? (
             <>
-              <a href={`/s/${slug}`} target="_blank" rel="noreferrer">
+              <Link to={`/s/${slug}`} target="_blank" rel="noreferrer">
                 View public site
-              </a>
+              </Link>
               <button
                 type="button"
                 className="button button-secondary"

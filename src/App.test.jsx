@@ -97,6 +97,14 @@ describe('App authentication routes', () => {
     expect(screen.queryByText('Private fixture app')).toBeNull()
   })
 
+  it('protects the standalone mini-site analytics route', () => {
+    renderAt('/mini-sites/site-1/analytics')
+
+    expect(
+      screen.getByRole('button', { name: 'Continue with Google' }),
+    ).toBeTruthy()
+  })
+
   it('renders public mini-sites outside the Arvenilo application layout', async () => {
     const repository = {
       getPublished: vi.fn().mockResolvedValue({

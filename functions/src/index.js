@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase-admin/app'
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore'
 import { getStorage } from 'firebase-admin/storage'
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
+import { createCallableOptions } from './callableOptions.js'
 import { createFirestoreStore } from './firestoreStore.js'
 import { createMiniSiteService } from './miniSiteService.js'
 
@@ -14,7 +15,7 @@ const store = createFirestoreStore({
   Timestamp,
 })
 const service = createMiniSiteService({ store })
-const callableOptions = { region: 'europe-west1', enforceAppCheck: true }
+const callableOptions = createCallableOptions()
 
 function asCallable(operation) {
   return onCall(callableOptions, async (request) => {
@@ -25,6 +26,10 @@ function asCallable(operation) {
         data: request.data,
       })
     } catch (error) {
+      console.error('Mini-site callable failed', {
+        code: error?.code,
+        message: error?.message,
+      })
       throw new HttpsError(
         error.code ?? 'internal',
         error.message ?? 'The mini-site operation failed.',

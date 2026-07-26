@@ -119,4 +119,21 @@ describe('useDraftAutosave', () => {
 
     expect(save).not.toHaveBeenCalled()
   })
+
+  it('continues saving after the Strict Mode development remount', async () => {
+    const save = vi.fn().mockResolvedValue({ draftRevision: 1 })
+    const { rerender } = renderHook(
+      ({ draft }) =>
+        useDraftAutosave({ draft, revision: 0, save, delay: 700 }),
+      {
+        initialProps: { draft: { name: 'Initial' } },
+        reactStrictMode: true,
+      },
+    )
+
+    rerender({ draft: { name: 'Changed' } })
+    await act(() => vi.advanceTimersByTimeAsync(700))
+
+    expect(save).toHaveBeenCalledWith({ name: 'Changed' }, 0)
+  })
 })

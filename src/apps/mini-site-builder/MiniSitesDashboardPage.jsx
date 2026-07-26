@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../auth/authContext.js'
 import { SITE_LIMIT } from './model/miniSiteModel.js'
@@ -46,6 +46,21 @@ export default function MiniSitesDashboardPage() {
   const [confirmationName, setConfirmationName] = useState('')
   const [duplicateTarget, setDuplicateTarget] = useState(null)
   const [duplicateForm, setDuplicateForm] = useState({ name: '', slug: '' })
+  const dialogRef = useRef(null)
+
+  useEffect(() => {
+    if (!deleteTarget && !duplicateTarget) return undefined
+    const previousFocus = document.activeElement
+    const frame = window.requestAnimationFrame(() => {
+      dialogRef.current
+        ?.querySelector('input, button, [href]')
+        ?.focus()
+    })
+    return () => {
+      window.cancelAnimationFrame(frame)
+      previousFocus?.focus?.()
+    }
+  }, [deleteTarget, duplicateTarget])
 
   const loadSites = useCallback(async () => {
     try {
@@ -173,12 +188,12 @@ export default function MiniSitesDashboardPage() {
                     <h2>{site.name}</h2>
                     <p>/s/{site.slug}</p>
                   </div>
-                  <a
-                    href={`/s/${site.slug}`}
+                  <Link
+                    to={`/s/${site.slug}`}
                     aria-label={`Open ${site.name} public site`}
                   >
                     ↗
-                  </a>
+                  </Link>
                 </div>
                 <dl className="mini-dashboard__metrics">
                   <div>
@@ -192,6 +207,9 @@ export default function MiniSitesDashboardPage() {
                 </dl>
                 <div className="mini-dashboard__actions">
                   <Link to={`/mini-sites/${site.id}/edit`}>Edit site</Link>
+                  <Link to={`/mini-sites/${site.id}/analytics`}>
+                    Analytics
+                  </Link>
                   <button
                     type="button"
                     disabled={atLimit}
@@ -222,7 +240,13 @@ export default function MiniSitesDashboardPage() {
 
       {deleteTarget && (
         <div className="mini-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-title">
-          <div className="mini-dialog__panel">
+          <div
+            className="mini-dialog__panel"
+            ref={dialogRef}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setDeleteTarget(null)
+            }}
+          >
             <h2 id="delete-title">Delete {deleteTarget.name}?</h2>
             <p>This removes the draft, published page, assets, and analytics.</p>
             <label>
@@ -251,7 +275,14 @@ export default function MiniSitesDashboardPage() {
 
       {duplicateTarget && (
         <div className="mini-dialog" role="dialog" aria-modal="true" aria-labelledby="duplicate-title">
-          <form className="mini-dialog__panel" onSubmit={duplicateSite}>
+          <form
+            className="mini-dialog__panel"
+            ref={dialogRef}
+            onSubmit={duplicateSite}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setDuplicateTarget(null)
+            }}
+          >
             <h2 id="duplicate-title">Duplicate {duplicateTarget.name}</h2>
             <label>
               Site name

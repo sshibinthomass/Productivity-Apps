@@ -4,15 +4,26 @@ import {
   ReCaptchaEnterpriseProvider,
 } from 'firebase/app-check'
 import {
+  connectAuthEmulator,
   getAuth,
   GoogleAuthProvider,
   onAuthStateChanged,
+  signInAnonymously,
   signInWithPopup,
   signOut,
 } from 'firebase/auth'
-import { getFirestore } from 'firebase/firestore'
-import { getFunctions } from 'firebase/functions'
-import { getStorage } from 'firebase/storage'
+import {
+  connectFirestoreEmulator,
+  getFirestore,
+} from 'firebase/firestore'
+import {
+  connectFunctionsEmulator,
+  getFunctions,
+} from 'firebase/functions'
+import {
+  connectStorageEmulator,
+  getStorage,
+} from 'firebase/storage'
 
 const REQUIRED_CONFIG = [
   ['VITE_FIREBASE_API_KEY', 'apiKey'],
@@ -39,13 +50,18 @@ const firebaseSdk = {
   getApps,
   initializeApp,
   getAuth,
+  connectAuthEmulator,
   GoogleAuthProvider,
   onAuthStateChanged,
+  signInAnonymously,
   signInWithPopup,
   signOut,
   getFirestore,
+  connectFirestoreEmulator,
   getStorage,
+  connectStorageEmulator,
   getFunctions,
+  connectFunctionsEmulator,
   initializeAppCheck,
   ReCaptchaEnterpriseProvider,
 }
@@ -147,10 +163,31 @@ export function createFirebaseClient(env, sdk = firebaseSdk) {
       ? env.VITE_FIREBASE_FUNCTIONS_REGION.trim()
       : 'europe-west1'
   const functions = sdk.getFunctions(app, region)
+  const useEmulators =
+    env.DEV && env.VITE_FIREBASE_USE_EMULATORS === 'true'
+  if (useEmulators) {
+    sdk.connectAuthEmulator(auth, 'http://127.0.0.1:9099', {
+      disableWarnings: true,
+    })
+    sdk.connectFirestoreEmulator(db, '127.0.0.1', 8080)
+    sdk.connectStorageEmulator(storage, '127.0.0.1', 9199)
+    sdk.connectFunctionsEmulator(functions, '127.0.0.1', 5001)
+    if (env.VITE_FIREBASE_EMULATOR_AUTO_LOGIN === 'true') {
+      void sdk.signInAnonymously(auth).catch(() => undefined)
+    }
+  }
   const siteKey =
     typeof env.VITE_FIREBASE_APP_CHECK_SITE_KEY === 'string'
       ? env.VITE_FIREBASE_APP_CHECK_SITE_KEY.trim()
       : ''
+  const debugToken =
+    typeof env.VITE_FIREBASE_APP_CHECK_DEBUG_TOKEN === 'string'
+      ? env.VITE_FIREBASE_APP_CHECK_DEBUG_TOKEN.trim()
+      : ''
+  if (env.DEV && siteKey && debugToken) {
+    globalThis.FIREBASE_APPCHECK_DEBUG_TOKEN =
+      debugToken === 'true' ? true : debugToken
+  }
   const appCheck = siteKey
     ? sdk.initializeAppCheck(app, {
         provider: new sdk.ReCaptchaEnterpriseProvider(siteKey),

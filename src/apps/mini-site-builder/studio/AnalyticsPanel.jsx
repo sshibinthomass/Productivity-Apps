@@ -150,13 +150,15 @@ export default function AnalyticsPanel({
           </div>
           <div
             className="mini-analytics__chart"
-            role="img"
+            role="group"
             aria-label="Views over time"
           >
             {state.data.days.map((day) => (
               <div
                 key={day.date}
                 title={`${formatDay(day.date)}: ${day.views ?? 0} views`}
+                role="img"
+                aria-label={`${formatDay(day.date)}: ${day.views ?? 0} views and ${day.clicks ?? 0} clicks`}
               >
                 <i
                   style={{
@@ -170,6 +172,25 @@ export default function AnalyticsPanel({
               </div>
             ))}
           </div>
+          <table className="mini-analytics__table">
+            <caption>Daily views and clicks</caption>
+            <thead>
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col">Views</th>
+                <th scope="col">Clicks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {state.data.days.map((day) => (
+                <tr key={day.date}>
+                  <th scope="row">{formatDay(day.date)}</th>
+                  <td>{day.views ?? 0}</td>
+                  <td>{day.clicks ?? 0}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 

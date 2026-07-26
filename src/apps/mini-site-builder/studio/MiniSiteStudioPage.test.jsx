@@ -180,7 +180,15 @@ describe('MiniSiteStudioPage', () => {
     await screen.findByText('Maya Studio')
 
     fireEvent.click(screen.getByRole('tab', { name: 'Design' }))
-    fireEvent.change(screen.getByLabelText('Page background'), {
+    const backgroundInput = screen.getByLabelText('Page background')
+    fireEvent.change(backgroundInput, {
+      target: { value: '#12' },
+    })
+    expect(backgroundInput.value).toBe('#12')
+    fireEvent.blur(backgroundInput)
+    expect(backgroundInput.value).toBe('#e9e5ff')
+
+    fireEvent.change(backgroundInput, {
       target: { value: '#112233' },
     })
     fireEvent.change(screen.getByLabelText('Content width'), {
@@ -198,6 +206,9 @@ describe('MiniSiteStudioPage', () => {
     expect(preview.style.getPropertyValue('--mini-button-radius')).toBe(
       '28px',
     )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset to template' }))
+    expect(preview.style.getPropertyValue('--mini-bg')).toBe('#e9e5ff')
   })
 
   it('updates settings, changes the public slug, and publishes explicitly', async () => {

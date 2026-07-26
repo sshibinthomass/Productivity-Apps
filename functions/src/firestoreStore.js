@@ -7,6 +7,26 @@ function publicAssetUrl(bucket, path) {
   return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(path)}?alt=media`
 }
 
+export function createAnalyticsUpdates(type, blockId, FieldValue) {
+  if (type === 'view') {
+    return {
+      summary: { totalViews: FieldValue.increment(1) },
+      day: { views: FieldValue.increment(1) },
+    }
+  }
+
+  return {
+    summary: {
+      totalClicks: FieldValue.increment(1),
+      linkClicks: { [blockId]: FieldValue.increment(1) },
+    },
+    day: {
+      clicks: FieldValue.increment(1),
+      linkClicks: { [blockId]: FieldValue.increment(1) },
+    },
+  }
+}
+
 export function createFirestoreStore({
   db,
   getBucket,
@@ -218,27 +238,12 @@ export function createFirestoreStore({
         const dayRef = db.doc(
           `users/${ownerId}/sites/${siteId}/analyticsDays/${day}`,
         )
-        const clickField = blockId ? `linkClicks.${blockId}` : null
-        const summaryUpdate =
-          type === 'view'
-            ? { totalViews: FieldValue.increment(1) }
-            : {
-                totalClicks: FieldValue.increment(1),
-                [clickField]: FieldValue.increment(1),
-              }
-        const dayUpdate =
-          type === 'view'
-            ? { date: day, views: FieldValue.increment(1) }
-            : {
-                date: day,
-                clicks: FieldValue.increment(1),
-                [clickField]: FieldValue.increment(1),
-              }
+        const updates = createAnalyticsUpdates(type, blockId, FieldValue)
         transaction.create(receiptRef, {
           expiresAt: Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000),
         })
-        transaction.set(summaryRef, summaryUpdate, { merge: true })
-        transaction.set(dayRef, dayUpdate, { merge: true })
+        transaction.set(summaryRef, updates.summary, { merge: true })
+        transaction.set(dayRef, { date: day, ...updates.day }, { merge: true })
         return { recorded: true }
       })
     },
