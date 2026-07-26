@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { downloadJson } from './downloadJson.js'
 import { JSON_SAMPLE, parseJson, repairJson } from './jsonUtils.js'
 import './JsonFormatterPage.css'
 
@@ -136,7 +137,7 @@ function FormattedEditor({
   )
 }
 
-export default function JsonFormatterPage() {
+export default function JsonFormatterPage({ downloadFile = downloadJson }) {
   const [sourceText, setSourceText] = useState('')
   const [formattedText, setFormattedText] = useState('')
   const [indent, setIndent] = useState(2)
@@ -279,6 +280,21 @@ export default function JsonFormatterPage() {
     }
   }
 
+  function handleDownload() {
+    if (!canCopy) {
+      return
+    }
+
+    try {
+      downloadFile(formattedText)
+      setCopyFeedback('JSON downloaded')
+    } catch {
+      setCopyFeedback(
+        'Download failed. Copy the JSON and save it manually.',
+      )
+    }
+  }
+
   function closeFullScreen() {
     setIsFullScreen(false)
     setTimeout(() => fullScreenTriggerRef.current?.focus(), 0)
@@ -409,6 +425,15 @@ export default function JsonFormatterPage() {
                 Copy JSON
               </button>
               <button
+                className="json-action json-action--download"
+                type="button"
+                disabled={!canCopy}
+                onClick={handleDownload}
+              >
+                Download JSON
+                <span aria-hidden="true">↓</span>
+              </button>
+              <button
                 ref={fullScreenTriggerRef}
                 className="json-action json-action--expand"
                 type="button"
@@ -460,6 +485,15 @@ export default function JsonFormatterPage() {
                 onClick={handleCopy}
               >
                 Copy JSON
+              </button>
+              <button
+                className="json-action json-action--download"
+                type="button"
+                disabled={!canCopy}
+                onClick={handleDownload}
+              >
+                Download JSON
+                <span aria-hidden="true">↓</span>
               </button>
               <button
                 className="json-action json-action--quiet"

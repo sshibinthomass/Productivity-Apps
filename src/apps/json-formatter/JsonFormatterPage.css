@@ -172,6 +172,16 @@
   background: var(--color-interface-white);
 }
 
+.json-action--download {
+  border-color: var(--color-anchor-gold);
+  color: #ffd987;
+}
+
+.json-action--download:hover:not(:disabled) {
+  background: var(--color-gold-wash);
+  color: var(--color-spatial-ink);
+}
+
 .json-action--expand {
   border-color: var(--color-digital-violet);
   color: #cfc5ff;

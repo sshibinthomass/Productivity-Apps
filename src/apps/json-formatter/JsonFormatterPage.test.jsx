@@ -152,6 +152,57 @@ describe('JsonFormatterPage', () => {
     expect(screen.getByText('Ready for JSON')).toBeTruthy()
   })
 
+  it('disables downloading until the document is valid', () => {
+    render(<JsonFormatterPage />)
+    const downloadButton = screen.getByRole('button', {
+      name: 'Download JSON',
+    })
+
+    expect(downloadButton.disabled).toBe(true)
+
+    fireEvent.change(screen.getByLabelText('Input JSON'), {
+      target: { value: '{"invalid":' },
+    })
+
+    expect(downloadButton.disabled).toBe(true)
+  })
+
+  it('downloads the current formatted JSON and reports success', () => {
+    let downloadedText = null
+    const downloadFile = (text) => {
+      downloadedText = text
+      return 'formatted-2026-07-26-143509.json'
+    }
+    render(<JsonFormatterPage downloadFile={downloadFile} />)
+
+    fireEvent.change(screen.getByLabelText('Input JSON'), {
+      target: { value: '{"download":true}' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Download JSON' }))
+
+    expect(downloadedText).toBe('{\n  "download": true\n}')
+    expect(screen.getByText('JSON downloaded')).toBeTruthy()
+  })
+
+  it('reports a browser download failure without changing the JSON', () => {
+    const downloadFile = () => {
+      throw new Error('Object URLs unavailable')
+    }
+    render(<JsonFormatterPage downloadFile={downloadFile} />)
+
+    fireEvent.change(screen.getByLabelText('Input JSON'), {
+      target: { value: '{"download":true}' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Download JSON' }))
+
+    expect(
+      screen.getByText('Download failed. Copy the JSON and save it manually.'),
+    ).toBeTruthy()
+    expect(screen.getByLabelText('Input JSON').value).toBe(
+      '{"download":true}',
+    )
+  })
+
   it('copies valid formatted JSON and reports success', async () => {
     render(<JsonFormatterPage />)
 
@@ -207,5 +258,18 @@ describe('JsonFormatterPage', () => {
 
     expect(screen.queryByRole('dialog')).toBeNull()
     await waitFor(() => expect(document.activeElement).toBe(trigger))
+  })
+
+  it('offers download in the full-screen toolbar', () => {
+    render(<JsonFormatterPage />)
+
+    fireEvent.change(screen.getByLabelText('Input JSON'), {
+      target: { value: '{"view":"large"}' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Full screen' }))
+
+    expect(
+      screen.getAllByRole('button', { name: 'Download JSON' }),
+    ).toHaveLength(2)
   })
 })
