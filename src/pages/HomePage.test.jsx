@@ -24,9 +24,10 @@ describe('HomePage', () => {
     ).toBeTruthy()
 
     const availability = screen.getByLabelText('Application availability')
-    expect(availability.textContent).toContain('1 available now')
+    expect(availability.textContent).toContain('2 available now')
     expect(availability.textContent).toContain('3 coming soon')
     expect(screen.getByText('Multi Link Opener')).toBeTruthy()
+    expect(screen.getByText('JSON Formatter')).toBeTruthy()
     expect(screen.getByText('Text Formatter')).toBeTruthy()
     expect(screen.getByText('Focus Timer')).toBeTruthy()
     expect(screen.getByText('Quick Notes')).toBeTruthy()
