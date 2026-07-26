@@ -30,6 +30,10 @@ const BLOCK_CONTENT_KEYS = {
   divider: ['style', 'width'],
   spacer: ['size'],
 }
+const DRAFT_BLOCK_CONTENT_KEYS = {
+  ...BLOCK_CONTENT_KEYS,
+  image: [...BLOCK_CONTENT_KEYS.image, 'storagePath'],
+}
 const DEFAULT_THEME = {
   background: {
     type: 'solid',
@@ -272,7 +276,7 @@ export function parseDraftForSave(value = {}) {
   }
 
   const normalizedBlocks = blocks.map((block) => {
-    const keys = BLOCK_CONTENT_KEYS[block?.type]
+    const keys = DRAFT_BLOCK_CONTENT_KEYS[block?.type]
     const id = typeof block?.id === 'string' ? block.id.trim() : ''
     if (!keys || !id || id.length > 128 || typeof block.content !== 'object') {
       throw functionError('invalid-argument', 'The draft contains an invalid block.')

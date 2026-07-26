@@ -340,14 +340,14 @@ a human.
 ## Storage Model
 
 - `mini-site-drafts/{uid}/{siteId}/{assetId}` — authenticated owner read/write;
-- `mini-site-public/{siteId}/{revision}/{assetId}` — public read, no client
-  writes.
+- `mini-site-public/{siteId}/{revision-attempt}/{assetId}` — public read, no
+  client writes.
 
 Uploads accept JPEG, PNG, WebP, or GIF images up to 5 MiB. The browser validates
 type and size before upload; Storage Rules repeat those checks. Publishing
-copies only referenced assets to the revisioned public prefix and writes those
-public URLs into the snapshot. Old public revisions are deleted after a
-successful publish.
+copies only referenced assets to an attempt-unique public prefix and writes
+those public URLs into the snapshot. Failed publishes retry cleanup without
+touching assets referenced by an existing live snapshot.
 
 ## Security Rules
 
@@ -355,8 +355,8 @@ Firestore rules will:
 
 - allow an authenticated user to get/list only site documents beneath their
   own UID;
-- allow an owner to update draft content fields while preventing client writes
-  to quota, analytics, publish-revision, and server timestamp fields;
+- deny direct draft mutations; revision-aware callable Functions validate and
+  save owner drafts, including the 40-block and 25-link limits;
 - deny all client creation and deletion of sites because those operations go
   through functions;
 - allow exact reads of published snapshots and deny client writes;

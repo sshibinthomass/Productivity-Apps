@@ -42,6 +42,7 @@ describe('Firestore store asset boundary', () => {
     const promotion = await store.promoteAssets({
       uid: 'user-1',
       siteId: 'site-1',
+      attemptId: 'attempt-1',
       draft: {
         draftRevision: 3,
         blocks: [
@@ -60,10 +61,10 @@ describe('Firestore store asset boundary', () => {
     expect(getBucket).toHaveBeenCalledTimes(1)
     expect(copy).toHaveBeenCalledOnce()
     expect(promotion.draft.blocks[0].content.url).toBe(
-      'https://firebasestorage.googleapis.com/v0/b/example.firebasestorage.app/o/mini-site-public%2Fsite-1%2F3%2Fimage-1.webp?alt=media',
+      'https://firebasestorage.googleapis.com/v0/b/example.firebasestorage.app/o/mini-site-public%2Fsite-1%2F3-attempt-1%2Fimage-1.webp?alt=media',
     )
     expect(promotion.publicPaths).toEqual([
-      'mini-site-public/site-1/3/image-1.webp',
+      'mini-site-public/site-1/3-attempt-1/image-1.webp',
     ])
   })
 
@@ -83,6 +84,7 @@ describe('Firestore store asset boundary', () => {
       store.promoteAssets({
         uid: 'user-1',
         siteId: 'site-1',
+        attemptId: 'attempt-1',
         draft: {
           blocks: [
             {
@@ -97,5 +99,51 @@ describe('Firestore store asset boundary', () => {
       }),
     ).rejects.toMatchObject({ code: 'invalid-argument' })
     expect(bucket.file).not.toHaveBeenCalled()
+  })
+
+  it('retries cleanup of attempt-unique promoted assets', async () => {
+    const remove = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Temporary storage failure'))
+      .mockRejectedValueOnce(new Error('Temporary storage failure'))
+      .mockResolvedValueOnce(undefined)
+    const store = createFirestoreStore({
+      db: {},
+      getBucket: () => ({
+        file: () => ({ delete: remove }),
+      }),
+      FieldValue: {},
+      Timestamp: {},
+    })
+
+    await expect(
+      store.cleanupPromotedAssets({
+        publicPaths: [
+          'mini-site-public/site-1/3-attempt-1/image.webp',
+        ],
+      }),
+    ).resolves.toBeUndefined()
+    expect(remove).toHaveBeenCalledTimes(3)
+  })
+
+  it('surfaces cleanup failures after bounded retries', async () => {
+    const remove = vi.fn().mockRejectedValue(new Error('Storage unavailable'))
+    const store = createFirestoreStore({
+      db: {},
+      getBucket: () => ({
+        file: () => ({ delete: remove }),
+      }),
+      FieldValue: {},
+      Timestamp: {},
+    })
+
+    await expect(
+      store.cleanupPromotedAssets({
+        publicPaths: [
+          'mini-site-public/site-1/3-attempt-2/image.webp',
+        ],
+      }),
+    ).rejects.toMatchObject({ code: 'internal' })
+    expect(remove).toHaveBeenCalledTimes(3)
   })
 })

@@ -121,7 +121,12 @@ export function createMiniSiteService({
       if (!draft) throwStoreError({ code: 'not-found' })
       validatePublishableDraft(draft)
       const promotion = store.promoteAssets
-        ? await store.promoteAssets({ uid, siteId, draft })
+        ? await store.promoteAssets({
+            uid,
+            siteId,
+            draft,
+            attemptId: createId(),
+          })
         : { draft, publicPaths: [] }
       try {
         return throwStoreError(
@@ -138,11 +143,9 @@ export function createMiniSiteService({
           promotion.publicPaths.length > 0 &&
           store.cleanupPromotedAssets
         ) {
-          await store
-            .cleanupPromotedAssets({
-              publicPaths: promotion.publicPaths,
-            })
-            .catch(() => undefined)
+          await store.cleanupPromotedAssets({
+            publicPaths: promotion.publicPaths,
+          })
         }
         throw error
       }

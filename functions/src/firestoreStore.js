@@ -33,6 +33,28 @@ export function createFirestoreStore({
   FieldValue,
   Timestamp,
 }) {
+  async function cleanupPublicPaths(publicPaths) {
+    const bucket = getBucket()
+    let pending = [...new Set(publicPaths)]
+    for (let attempt = 0; attempt < 3 && pending.length > 0; attempt += 1) {
+      const results = await Promise.allSettled(
+        pending.map((publicPath) =>
+          bucket.file(publicPath).delete({ ignoreNotFound: true }),
+        ),
+      )
+      pending = pending.filter(
+        (_publicPath, index) => results[index].status === 'rejected',
+      )
+    }
+    if (pending.length > 0) {
+      const error = new Error(
+        `Could not clean up ${pending.length} promoted mini-site asset(s).`,
+      )
+      error.code = 'internal'
+      throw error
+    }
+  }
+
   return {
     async create({ uid, draft }) {
       return db.runTransaction(async (transaction) => {
@@ -128,7 +150,7 @@ export function createFirestoreStore({
       })
     },
 
-    async promoteAssets({ uid, siteId, draft }) {
+    async promoteAssets({ uid, siteId, draft, attemptId }) {
       const bucket = getBucket()
       const revision = draft.draftRevision ?? 0
       const nextDraft = structuredClone(draft)
@@ -151,7 +173,8 @@ export function createFirestoreStore({
           throw error
         }
         const filename = storagePath.split('/').at(-1)
-        const publicPath = `mini-site-public/${siteId}/${revision}/${filename}`
+        const publicPath =
+          `mini-site-public/${siteId}/${revision}-${attemptId}/${filename}`
         promotions.push({ storagePath, publicPath })
         if (block.type === 'image') {
           block.content.url = publicAssetUrl(bucket, publicPath)
@@ -159,19 +182,19 @@ export function createFirestoreStore({
           block.content.avatarUrl = publicAssetUrl(bucket, publicPath)
         }
       }
-      try {
-        await Promise.all(
-          promotions.map(({ storagePath, publicPath }) =>
-            bucket.file(storagePath).copy(bucket.file(publicPath)),
-          ),
+      const copyResults = await Promise.allSettled(
+        promotions.map(({ storagePath, publicPath }) =>
+          bucket.file(storagePath).copy(bucket.file(publicPath)),
+        ),
+      )
+      const failedCopy = copyResults.find(
+        ({ status }) => status === 'rejected',
+      )
+      if (failedCopy) {
+        await cleanupPublicPaths(
+          promotions.map(({ publicPath }) => publicPath),
         )
-      } catch (error) {
-        await Promise.allSettled(
-          promotions.map(({ publicPath }) =>
-            bucket.file(publicPath).delete({ ignoreNotFound: true }),
-          ),
-        )
-        throw error
+        throw failedCopy.reason
       }
       return {
         draft: nextDraft,
@@ -180,12 +203,7 @@ export function createFirestoreStore({
     },
 
     async cleanupPromotedAssets({ publicPaths }) {
-      const bucket = getBucket()
-      await Promise.allSettled(
-        publicPaths.map((publicPath) =>
-          bucket.file(publicPath).delete({ ignoreNotFound: true }),
-        ),
-      )
+      return cleanupPublicPaths(publicPaths)
     },
 
     async publish({ uid, siteId, snapshot, expectedRevision }) {

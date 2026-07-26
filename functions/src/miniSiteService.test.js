@@ -197,19 +197,37 @@ describe('mini-site lifecycle service', () => {
     store.sites.set('user-1/site-1', original)
     const service = createMiniSiteService({ store })
 
-    await expect(
-      service.saveMiniSiteDraft({
-        auth: { uid: 'user-1' },
-        data: {
-          siteId: 'site-1',
-          expectedRevision: 1,
-          draft: { ...original, name: 'Updated site' },
+    const saved = await service.saveMiniSiteDraft({
+      auth: { uid: 'user-1' },
+      data: {
+        siteId: 'site-1',
+        expectedRevision: 1,
+        draft: {
+          ...original,
+          name: 'Updated site',
+          blocks: [
+            {
+              id: 'image-1',
+              type: 'image',
+              visible: true,
+              content: {
+                url: 'https://storage.example/draft-token',
+                storagePath:
+                  'mini-site-drafts/user-1/site-1/image-1.webp',
+                alt: 'Example',
+              },
+            },
+          ],
         },
-      }),
-    ).resolves.toMatchObject({
+      },
+    })
+    expect(saved).toMatchObject({
       name: 'Updated site',
       draftRevision: 2,
     })
+    expect(saved.blocks[0].content.storagePath).toBe(
+      'mini-site-drafts/user-1/site-1/image-1.webp',
+    )
 
     await expect(
       service.saveMiniSiteDraft({
