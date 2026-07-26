@@ -45,7 +45,9 @@ async function readJson(request) {
   if (new TextEncoder().encode(text).byteLength > MAX_JSON_BYTES) {
     throw new ApiError('request_too_large', 'JSON request bodies must not exceed 1 MiB.', 413)
   }
-  if (!text.trim()) return {}
+  if (!text.trim()) {
+    throw new ApiError('invalid_argument', 'Request body must contain a JSON object.', 400)
+  }
 
   try {
     return JSON.parse(text)

@@ -269,6 +269,36 @@ describe('authenticated mini-site routes', () => {
     })
   })
 
+  it.each([
+    ['publish', ''],
+    ['unpublish', ''],
+    ['publish', ' \n\t '],
+    ['unpublish', ' \n\t '],
+  ])('rejects an empty JSON %s request before changing the site', async (action, body) => {
+    const site = await createSite()
+    const save = await authenticated(`/v1/sites/${site.siteId}`, {
+      method: 'PUT',
+      json: {
+        expectedRevision: site.draftRevision,
+        draft: {
+          name: site.name, templateId: site.templateId,
+          blocks: [{ id: 'link-1', type: 'link', visible: true, content: { label: 'Portfolio', url: 'https://example.com', supportingText: '', icon: '' } }],
+          theme: {}, seo: { title: site.name, description: '', socialImagePath: null },
+        },
+      },
+    })
+    expect(save.status).toBe(200)
+    const response = await authenticated(`/v1/sites/${site.siteId}/${action}`, {
+      method: 'POST', body, contentType: 'application/json',
+    })
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'invalid_argument' } })
+    await expect(env.DB.prepare('SELECT status, published_at FROM mini_sites WHERE id = ?').bind(site.siteId).first()).resolves.toEqual({
+      status: 'draft', published_at: null,
+    })
+  })
+
   it('denies signed-out item routes without changing the owned site', async () => {
     const site = await createSite()
     const draft = {
