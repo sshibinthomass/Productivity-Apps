@@ -1,6 +1,8 @@
 import MultiLinkOpenerPage from '../apps/multi-link-opener/MultiLinkOpenerPage.jsx'
 import JsonFormatterPage from '../apps/json-formatter/JsonFormatterPage.jsx'
 import TextComparisonPage from '../apps/text-comparison/TextComparisonPage.jsx'
+import MiniSitesDashboardPage from '../apps/mini-site-builder/MiniSitesDashboardPage.jsx'
+import { MiniSiteIcon } from '../apps/mini-site-builder/icons.jsx'
 import LinkIcon from '../components/icons/LinkIcon.jsx'
 import {
   CompareIcon,
@@ -49,6 +51,19 @@ export const appRegistry = [
     accent: 'violet',
     requiresAuth: false,
     component: TextComparisonPage,
+  },
+  {
+    id: 'mini-site-builder',
+    title: 'Mini-Site Builder',
+    description:
+      'Shape and publish focused public pages for every part of your work.',
+    category: 'Creator utility',
+    status: 'available',
+    path: '/mini-sites',
+    icon: MiniSiteIcon,
+    accent: 'mint',
+    requiresAuth: true,
+    component: MiniSitesDashboardPage,
   },
   {
     id: 'text-formatter',

@@ -3,9 +3,9 @@ import { appRegistry, availableApps } from './appRegistry.jsx'
 
 describe('appRegistry', () => {
   it('models the available and announced Arvenilo Network applications', () => {
-    expect(appRegistry).toHaveLength(6)
+    expect(appRegistry).toHaveLength(7)
     expect(appRegistry.filter((app) => app.status === 'available')).toHaveLength(
-      3,
+      4,
     )
     expect(
       appRegistry.filter((app) => app.status === 'coming-soon'),
@@ -14,6 +14,7 @@ describe('appRegistry', () => {
       'Multi Link Opener',
       'JSON Formatter',
       'Text Comparison',
+      'Mini-Site Builder',
       'Text Formatter',
       'Focus Timer',
       'Quick Notes',
@@ -62,8 +63,22 @@ describe('appRegistry', () => {
     expect(typeof appRegistry[2].icon).toBe('function')
   })
 
+  it('registers Mini-Site Builder as an authenticated creator tool', () => {
+    expect(appRegistry[3]).toMatchObject({
+      id: 'mini-site-builder',
+      title: 'Mini-Site Builder',
+      path: '/mini-sites',
+      accent: 'mint',
+      category: 'Creator utility',
+      status: 'available',
+      requiresAuth: true,
+    })
+    expect(typeof appRegistry[3].component).toBe('function')
+    expect(typeof appRegistry[3].icon).toBe('function')
+  })
+
   it('exposes routes only for complete available applications', () => {
-    expect(availableApps).toHaveLength(3)
+    expect(availableApps).toHaveLength(4)
     expect(availableApps[0]).toMatchObject({
       title: 'Multi Link Opener',
       path: '/multi-link-opener',
@@ -82,6 +97,12 @@ describe('appRegistry', () => {
       status: 'available',
     })
     expect(typeof availableApps[2].component).toBe('function')
+    expect(availableApps[3]).toMatchObject({
+      title: 'Mini-Site Builder',
+      path: '/mini-sites',
+      status: 'available',
+      requiresAuth: true,
+    })
   })
 
   it('uses unique ids and paths', () => {
