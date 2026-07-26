@@ -1,5 +1,7 @@
-import { cloudflareTest } from '@cloudflare/vitest-pool-workers'
+import { cloudflareTest, readD1Migrations } from '@cloudflare/vitest-pool-workers'
 import { defineConfig } from 'vitest/config'
+
+const migrations = await readD1Migrations('./worker/migrations')
 
 export default defineConfig({
   test: {
@@ -15,6 +17,7 @@ export default defineConfig({
           BETTER_AUTH_SECRET: 'test-better-auth-secret',
           TURNSTILE_SECRET_KEY: 'test-turnstile-secret',
           RESEND_API_KEY: 'test-resend-api-key',
+          TEST_MIGRATIONS: migrations,
         },
       },
     }),

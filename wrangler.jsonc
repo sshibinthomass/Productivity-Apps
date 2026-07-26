@@ -9,7 +9,11 @@
     { "pattern": "links.shibinthomas.com", "custom_domain": true }
   ],
   "d1_databases": [
-    { "binding": "DB", "database_name": "productivity-apps" }
+    {
+      "binding": "DB",
+      "database_name": "productivity-apps",
+      "migrations_dir": "worker/migrations"
+    }
   ],
   "r2_buckets": [{ "binding": "MEDIA" }],
   "assets": {
