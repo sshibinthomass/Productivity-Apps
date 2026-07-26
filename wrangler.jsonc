@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "productivity-apps",
+  "main": "worker/src/index.js",
+  "compatibility_date": "2026-07-26",
+  "compatibility_flags": ["nodejs_compat"],
+  "routes": [
+    { "pattern": "api.shibinthomas.com", "custom_domain": true },
+    { "pattern": "links.shibinthomas.com", "custom_domain": true }
+  ],
+  "d1_databases": [
+    { "binding": "DB", "database_name": "productivity-apps" }
+  ],
+  "r2_buckets": [{ "binding": "MEDIA" }],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "vars": {
+    "APP_ORIGIN": "https://app.shibinthomas.com",
+    "API_ORIGIN": "https://api.shibinthomas.com",
+    "PUBLIC_SITE_ORIGIN": "https://links.shibinthomas.com",
+    "EMAIL_FROM": "Arvenilo <no-reply@shibinthomas.com>"
+  },
+  "triggers": { "crons": ["15 3 * * *"] }
+}

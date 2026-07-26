@@ -5,24 +5,33 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:worker": "wrangler dev",
     "build": "vite build",
     "build:sites": "node scripts/build-sites.mjs",
     "preview": "vite preview",
     "test": "vitest",
-    "test:run": "vitest run src functions",
+    "test:frontend": "vitest run src",
+    "test:worker": "npm run build && vitest run --config worker/vitest.config.js",
+    "test:run": "npm run test:frontend && npm run test:worker",
     "test:firebase": "firebase emulators:exec --project demo-mini-sites --only firestore,storage \"vitest run firebase-tests/rules.test.js\"",
+    "db:migrate:local": "wrangler d1 migrations apply productivity-apps --local",
+    "db:migrate:remote": "wrangler d1 migrations apply productivity-apps --remote",
+    "deploy:worker": "npm run build && wrangler deploy",
     "emulators": "firebase emulators:start --project demo-mini-sites --only auth,firestore,storage,functions",
     "lint": "eslint ."
   },
   "dependencies": {
+    "better-auth": "1.6.25",
     "diff": "^9.0.0",
     "firebase": "^12.16.0",
     "qr-code-styling": "^1.9.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "react-router-dom": "7.18.1"
+    "react-router-dom": "7.18.1",
+    "resend": "6.18.0"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.18.8",
     "@eslint/js": "10.0.1",
     "@firebase/rules-unit-testing": "^5.0.1",
     "@testing-library/react": "^16.3.2",
@@ -34,7 +43,8 @@
     "globals": "16.5.0",
     "jsdom": "^29.1.1",
     "vite": "8.1.5",
-    "vitest": "4.1.10"
+    "vitest": "4.1.10",
+    "wrangler": "4.114.0"
   },
   "optionalDependencies": {
     "@rolldown/binding-linux-x64-gnu": "1.1.5",
