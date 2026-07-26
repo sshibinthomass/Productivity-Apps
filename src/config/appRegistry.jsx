@@ -1,7 +1,9 @@
 import MultiLinkOpenerPage from '../apps/multi-link-opener/MultiLinkOpenerPage.jsx'
 import JsonFormatterPage from '../apps/json-formatter/JsonFormatterPage.jsx'
+import TextComparisonPage from '../apps/text-comparison/TextComparisonPage.jsx'
 import LinkIcon from '../components/icons/LinkIcon.jsx'
 import {
+  CompareIcon,
   JsonIcon,
   NotesIcon,
   TextIcon,
@@ -34,6 +36,19 @@ export const appRegistry = [
     accent: 'gold',
     requiresAuth: false,
     component: JsonFormatterPage,
+  },
+  {
+    id: 'text-comparison',
+    title: 'Text Comparison',
+    description:
+      'Compare prose or code and trace every addition and removal side by side.',
+    category: 'Developer utility',
+    status: 'available',
+    path: '/text-comparison',
+    icon: CompareIcon,
+    accent: 'violet',
+    requiresAuth: false,
+    component: TextComparisonPage,
   },
   {
     id: 'text-formatter',

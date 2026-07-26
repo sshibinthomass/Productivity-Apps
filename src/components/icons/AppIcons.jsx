@@ -69,3 +69,17 @@ export function JsonIcon({ size = 24 }) {
     </IconFrame>
   )
 }
+
+export function CompareIcon({ size = 24 }) {
+  return (
+    <IconFrame size={size}>
+      <path
+        d="M4.5 6h6M4.5 10h4M13.5 14h6M15.5 18h4M11 7.5l2-2 2 2M13 5.5v5M13 16.5l-2 2-2-2M11 18.5v-5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </IconFrame>
+  )
+}

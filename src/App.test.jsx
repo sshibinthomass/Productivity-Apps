@@ -59,6 +59,16 @@ describe('App authentication routes', () => {
     ).toBeNull()
   })
 
+  it('keeps Text Comparison public for a signed-out user', () => {
+    renderAt('/text-comparison')
+
+    expect(screen.getByLabelText('Text 1 / Original')).toBeTruthy()
+    expect(screen.getByLabelText('Text 2 / Revised')).toBeTruthy()
+    expect(
+      screen.queryByRole('button', { name: 'Continue with Google' }),
+    ).toBeNull()
+  })
+
   it('applies the protected-route boundary to opted-in registry apps', () => {
     const PrivateFixture = () => <p>Private fixture app</p>
     const protectedRegistry = [

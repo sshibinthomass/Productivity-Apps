@@ -3,9 +3,9 @@ import { appRegistry, availableApps } from './appRegistry.jsx'
 
 describe('appRegistry', () => {
   it('models the available and announced Arvenilo Network applications', () => {
-    expect(appRegistry).toHaveLength(5)
+    expect(appRegistry).toHaveLength(6)
     expect(appRegistry.filter((app) => app.status === 'available')).toHaveLength(
-      2,
+      3,
     )
     expect(
       appRegistry.filter((app) => app.status === 'coming-soon'),
@@ -13,6 +13,7 @@ describe('appRegistry', () => {
     expect(appRegistry.map((app) => app.title)).toEqual([
       'Multi Link Opener',
       'JSON Formatter',
+      'Text Comparison',
       'Text Formatter',
       'Focus Timer',
       'Quick Notes',
@@ -47,8 +48,22 @@ describe('appRegistry', () => {
     expect(typeof appRegistry[1].icon).toBe('function')
   })
 
+  it('registers Text Comparison as a public developer utility', () => {
+    expect(appRegistry[2]).toMatchObject({
+      id: 'text-comparison',
+      title: 'Text Comparison',
+      path: '/text-comparison',
+      accent: 'violet',
+      category: 'Developer utility',
+      status: 'available',
+      requiresAuth: false,
+    })
+    expect(typeof appRegistry[2].component).toBe('function')
+    expect(typeof appRegistry[2].icon).toBe('function')
+  })
+
   it('exposes routes only for complete available applications', () => {
-    expect(availableApps).toHaveLength(2)
+    expect(availableApps).toHaveLength(3)
     expect(availableApps[0]).toMatchObject({
       title: 'Multi Link Opener',
       path: '/multi-link-opener',
@@ -61,6 +76,12 @@ describe('appRegistry', () => {
       status: 'available',
     })
     expect(typeof availableApps[1].component).toBe('function')
+    expect(availableApps[2]).toMatchObject({
+      title: 'Text Comparison',
+      path: '/text-comparison',
+      status: 'available',
+    })
+    expect(typeof availableApps[2].component).toBe('function')
   })
 
   it('uses unique ids and paths', () => {
