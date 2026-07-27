@@ -15,6 +15,12 @@ function sessionViewEventId(slug) {
   return eventId
 }
 
+function clickEventId() {
+  const entropy = globalThis.crypto?.randomUUID?.() ??
+    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+  return `click-${entropy}`
+}
+
 function claimViewEvent(slug) {
   const reportedKey = `mini-site-view-reported:${slug}`
   if (globalThis.sessionStorage?.getItem(reportedKey)) return null
@@ -120,7 +126,7 @@ export default function PublicMiniSitePage() {
             slug,
             type: 'link_click',
             blockId,
-            eventId: `${sessionViewEventId(slug)}:${blockId}:${Date.now()}`,
+            eventId: clickEventId(),
           })
           .catch(() => {})
       }}

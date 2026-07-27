@@ -48,6 +48,13 @@ export default function App({
   if (isPublicHost) {
     return (
       <Routes>
+        <Route path="/" element={<PublicHostNotFound />} />
+        <Route path="/login" element={<PublicHostNotFound />} />
+        <Route path="/verify-email" element={<PublicHostNotFound />} />
+        <Route path="/forgot-password" element={<PublicHostNotFound />} />
+        <Route path="/reset-password" element={<PublicHostNotFound />} />
+        <Route path="/account/*" element={<PublicHostNotFound />} />
+        <Route path="/mini-sites/*" element={<PublicHostNotFound />} />
         <Route path="/:slug" element={<PublicMiniSitePage />} />
         <Route path="*" element={<PublicHostNotFound />} />
       </Routes>
