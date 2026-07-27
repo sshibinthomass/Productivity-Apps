@@ -49,6 +49,7 @@ describe('public mini-site analytics', () => {
     expect(await link.json()).toEqual({ recorded: true, duplicate: false })
     expect(await social.json()).toEqual({ recorded: true, duplicate: false })
     await expect(env.DB.prepare('SELECT view_count, click_count FROM analytics_summary WHERE site_id = ?').bind('site-1').first()).resolves.toEqual({ view_count: 1, click_count: 2 })
+    await expect(env.DB.prepare('SELECT block_id, click_count FROM analytics_link_clicks WHERE site_id = ? ORDER BY block_id').bind('site-1').all()).resolves.toMatchObject({ results: [{ block_id: 'portfolio', click_count: 1 }, { block_id: 'socials', click_count: 1 }] })
   })
 
   it('rejects unknown, hidden, or unpublished click targets without incrementing counters', async () => {
@@ -73,6 +74,14 @@ describe('public mini-site analytics', () => {
     expect(bodies.filter(({ recorded }) => recorded)).toHaveLength(1)
     expect(bodies.filter(({ duplicate }) => duplicate)).toHaveLength(3)
     await expect(env.DB.prepare('SELECT view_count, click_count FROM analytics_summary WHERE site_id = ?').bind('site-1').first()).resolves.toEqual({ view_count: 1, click_count: 0 })
+  })
+
+  it('increments a durable per-link counter once for concurrent duplicate click receipts', async () => {
+    const responses = await Promise.all(Array.from({ length: 4 }, () => worker.fetch(
+      event('maya-links', { type: 'link_click', blockId: 'portfolio', eventId: 'duplicate-link-0001' }), env, createExecutionContext(),
+    )))
+    expect((await Promise.all(responses.map((response) => response.json()))).filter(({ recorded }) => recorded)).toHaveLength(1)
+    await expect(env.DB.prepare('SELECT click_count FROM analytics_link_clicks WHERE site_id = ? AND block_id = ?').bind('site-1', 'portfolio').first()).resolves.toEqual({ click_count: 1 })
   })
 
   it('rejects view block IDs, caps oversized bodies before JSON parsing, and rate limits a client before event writes', async () => {
@@ -158,5 +167,13 @@ describe('public mini-site analytics', () => {
     await expect(env.DB.prepare('SELECT COUNT(*) AS count FROM analytics_events').first()).resolves.toEqual({ count: 0 })
     await expect(env.DB.prepare('SELECT COUNT(*) AS count FROM auth_rate_limits').first()).resolves.toEqual({ count: 0 })
     await expect(env.DB.prepare('SELECT COUNT(*) AS count FROM public_event_rate_limits').first()).resolves.toEqual({ count: 0 })
+  })
+
+  it('keeps durable link totals after receipt retention cleanup', async () => {
+    await worker.fetch(event('maya-links', { type: 'link_click', blockId: 'portfolio', eventId: 'durable-click-0001' }), env, createExecutionContext())
+    await env.DB.prepare("UPDATE analytics_events SET expires_at = '2020-01-01T00:00:00.000Z'").run()
+    await worker.scheduled({ scheduledTime: Date.now() }, env, createExecutionContext())
+    await expect(env.DB.prepare('SELECT COUNT(*) AS count FROM analytics_events').first()).resolves.toEqual({ count: 0 })
+    await expect(env.DB.prepare('SELECT click_count FROM analytics_link_clicks WHERE site_id = ? AND block_id = ?').bind('site-1', 'portfolio').first()).resolves.toEqual({ click_count: 1 })
   })
 })

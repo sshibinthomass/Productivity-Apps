@@ -63,10 +63,18 @@ export function createAnalyticsService({ db, now = () => new Date(), beforePersi
       const expires = new Date(occurred.getTime() + RETENTION_DAYS * 86400000)
       const kind = eventName(input.type)
       const id = await receiptId({ siteId: published.site_id, revision: published.revision, ...input })
-      const inserted = await db.batch([
+      const statements = [
         db.prepare(`INSERT OR IGNORE INTO analytics_events (receipt_id, site_id, event_type, block_id, occurred_at, expires_at)
           SELECT ?1, site_id, ?2, ?3, ?4, ?5 FROM published_sites
           WHERE slug = ?6 AND site_id = ?7 AND revision = ?8`).bind(id, kind, input.blockId ?? null, occurred.toISOString(), expires.toISOString(), input.slug, published.site_id, published.revision),
+      ]
+      if (kind === 'click') {
+        statements.push(db.prepare(`INSERT INTO analytics_link_clicks (site_id, block_id, click_count)
+          SELECT ?1, ?2, 1 WHERE changes() = 1
+          ON CONFLICT(site_id, block_id) DO UPDATE SET click_count = click_count + excluded.click_count`)
+          .bind(published.site_id, input.blockId))
+      }
+      statements.push(
         db.prepare(`INSERT INTO analytics_summary (site_id, view_count, click_count, updated_at)
           SELECT ?1, ?2, ?3, ?4 WHERE changes() = 1
           ON CONFLICT(site_id) DO UPDATE SET view_count = view_count + excluded.view_count, click_count = click_count + excluded.click_count, updated_at = excluded.updated_at`)
@@ -75,7 +83,8 @@ export function createAnalyticsService({ db, now = () => new Date(), beforePersi
           SELECT ?1, ?2, ?3, ?4 WHERE changes() = 1
           ON CONFLICT(site_id, day) DO UPDATE SET view_count = view_count + excluded.view_count, click_count = click_count + excluded.click_count`)
           .bind(published.site_id, occurred.toISOString().slice(0, 10), kind === 'view' ? 1 : 0, kind === 'click' ? 1 : 0),
-      ])
+      )
+      const inserted = await db.batch(statements)
       if (inserted[0].meta.changes === 1) return { recorded: true, duplicate: false }
       const existing = await db.prepare('SELECT receipt_id FROM analytics_events WHERE receipt_id = ?1').bind(id).first()
       return { recorded: false, duplicate: Boolean(existing) }

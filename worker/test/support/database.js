@@ -2,6 +2,7 @@ import { applyD1Migrations } from 'cloudflare:test'
 
 const tables = [
   'analytics_events',
+  'analytics_link_clicks',
   'analytics_days',
   'analytics_summary',
   'public_event_rate_limits',

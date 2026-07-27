@@ -185,6 +185,7 @@ export function createD1Store({ db } = {}) {
         db.prepare(`DELETE FROM analytics_summary WHERE site_id = ?1 AND ${guard}`).bind(siteId, userId, confirmationName),
         db.prepare(`DELETE FROM analytics_days WHERE site_id = ?1 AND ${guard}`).bind(siteId, userId, confirmationName),
         db.prepare(`DELETE FROM analytics_events WHERE site_id = ?1 AND ${guard}`).bind(siteId, userId, confirmationName),
+        db.prepare(`DELETE FROM analytics_link_clicks WHERE site_id = ?1 AND ${guard}`).bind(siteId, userId, confirmationName),
         db.prepare('DELETE FROM mini_sites WHERE id = ?1 AND owner_id = ?2 AND name = ?3').bind(siteId, userId, confirmationName),
       ]
       const results = await db.batch(statements)
@@ -202,9 +203,7 @@ export function createD1Store({ db } = {}) {
       const [summaryRow, daysResult, linkResult] = await db.batch([
         db.prepare('SELECT view_count, click_count FROM analytics_summary WHERE site_id = ?1 LIMIT 1').bind(siteId),
         db.prepare('SELECT day, view_count, click_count FROM analytics_days WHERE site_id = ?1 ORDER BY day DESC LIMIT 30').bind(siteId),
-        db.prepare(`SELECT block_id, COUNT(*) AS click_count FROM analytics_events
-          WHERE site_id = ?1 AND event_type = 'click' AND block_id IS NOT NULL
-          GROUP BY block_id`).bind(siteId),
+        db.prepare('SELECT block_id, click_count FROM analytics_link_clicks WHERE site_id = ?1').bind(siteId),
       ])
       return {
         summary: {

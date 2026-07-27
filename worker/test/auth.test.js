@@ -451,7 +451,7 @@ describe('Better Auth email sessions', () => {
   })
 
   it('uses only an exact configured development origin for CORS and Turnstile', async () => {
-    const developmentEnv = { ...env, DEV_ORIGIN: devOrigin }
+    const developmentEnv = { ...env, DEV_ORIGIN: devOrigin, LOCAL_API_ORIGIN: 'http://localhost:8787' }
     const accepted = await worker.fetch(
       accountRequest('/auth/request-password-reset', { email: 'missing@example.com' }, { origin: devOrigin }),
       developmentEnv,

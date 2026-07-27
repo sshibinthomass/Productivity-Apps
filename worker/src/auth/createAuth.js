@@ -1,6 +1,5 @@
 import { betterAuth } from 'better-auth'
 import { createEmailSender } from './email.js'
-import { createLocalEmailCapture, isLocalEmailCaptureEnabled } from './localEmailCapture.js'
 import { ApiError } from '../http/errors.js'
 import { configuredOrigins, isLocalDevelopmentOrigin } from '../http/cors.js'
 
@@ -20,13 +19,11 @@ async function requireRecordedConsent(db, user) {
 export function createAuth(env, dependencies = {}) {
   const isLocalAuth = isLocalDevelopmentOrigin(env.APP_ORIGIN)
     && isLocalDevelopmentOrigin(env.API_ORIGIN)
-  const email = dependencies.email ?? (isLocalEmailCaptureEnabled(env)
-    ? createLocalEmailCapture()
-    : createEmailSender({
+  const email = dependencies.email ?? createEmailSender({
       apiKey: env.RESEND_API_KEY,
       from: env.EMAIL_FROM,
       appOrigin: env.APP_ORIGIN,
-    }))
+    })
   const requireConsent = dependencies.requireConsent
     ?? ((user) => requireRecordedConsent(env.DB, user))
 

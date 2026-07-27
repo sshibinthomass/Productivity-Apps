@@ -21,10 +21,19 @@ describe('application bootstrap host boundary', () => {
     expect(isPublicMiniSiteHost(host)).toBe(false)
   })
 
-  it('recognizes a Worker-rendered public page on a loopback development origin', () => {
+  it('recognizes a Worker-rendered public page only on a loopback development origin', () => {
     expect(isPublicMiniSiteHost('127.0.0.1:8787', {
       getElementById: (id) => id === 'mini-site-bootstrap' ? {} : null,
     })).toBe(true)
+    expect(isPublicMiniSiteHost('localhost:8787', {
+      getElementById: (id) => id === 'mini-site-bootstrap' ? {} : null,
+    })).toBe(true)
+    expect(isPublicMiniSiteHost('app.shibinthomas.com', {
+      getElementById: (id) => id === 'mini-site-bootstrap' ? {} : null,
+    })).toBe(false)
+    expect(isPublicMiniSiteHost('attacker.example', {
+      getElementById: (id) => id === 'mini-site-bootstrap' ? {} : null,
+    })).toBe(false)
   })
 
   it('does not mount the auth boundary or management routes on the public host', () => {

@@ -1,5 +1,5 @@
 import { createAuth } from './auth/createAuth.js'
-import { localEmailCaptureResponse } from './auth/localEmailCapture.js'
+import { createLocalEmailCapture, localEmailCaptureResponse } from './auth/localEmailCapture.js'
 import { enforceRateLimit } from './auth/rateLimit.js'
 import { getSession } from './auth/session.js'
 import { verifyTurnstile } from './auth/turnstile.js'
@@ -61,13 +61,21 @@ function localRequestBranch(pathname) {
   return 'api'
 }
 
-function isLocalRuntime(env) {
+function hasLocalRuntimeConfiguration(env) {
   return isLocalDevelopmentOrigin(env?.DEV_ORIGIN)
     && isLocalDevelopmentOrigin(env?.LOCAL_API_ORIGIN)
 }
 
-function requestBranch(hostname, pathname, runtimeEnv) {
-  if (isLocalRuntime(runtimeEnv)
+export function isLocalRuntimeRequest(request, env) {
+  const cf = request.cf
+  return hasLocalRuntimeConfiguration(env)
+    && !request.headers.has('CF-Ray')
+    && (cf === undefined || cf === null || Object.keys(cf).length === 0)
+}
+
+function requestBranch(request, runtimeEnv) {
+  const { hostname, pathname } = new URL(request.url)
+  if (isLocalRuntimeRequest(request, runtimeEnv)
     && (isLocalRuntimeHostname(hostname) || hostname === 'api.shibinthomas.com' || hostname === 'links.shibinthomas.com')) {
     return localRequestBranch(pathname)
   }
@@ -79,8 +87,14 @@ function requestBranch(hostname, pathname, runtimeEnv) {
   return null
 }
 
-export function localRuntimeEnvironment(env) {
-  if (!isLocalRuntime(env)) return env
+export function localRuntimeEnvironment(env, localRequest = false) {
+  if (!localRequest) {
+    const productionEnv = { ...env }
+    delete productionEnv.DEV_ORIGIN
+    delete productionEnv.LOCAL_API_ORIGIN
+    delete productionEnv.LOCAL_EMAIL_CAPTURE
+    return productionEnv
+  }
   return {
     ...env,
     APP_ORIGIN: env.DEV_ORIGIN,
@@ -203,7 +217,7 @@ async function persistConsentAndSendVerification(request, env, auth, body, depen
   await auth.handler(verificationRequest(request, env, body, user.email))
 }
 
-async function handleAuthRequest(request, env, auth, dependencies) {
+async function handleAuthRequest(request, env, auth, dependencies, localRequest) {
   const { pathname } = new URL(request.url)
   const limit = protectedAuthRoutes.get(pathname)
 
@@ -237,7 +251,7 @@ async function handleAuthRequest(request, env, auth, dependencies) {
       token: request.headers.get('X-Turnstile-Token'),
       secret: env.TURNSTILE_SECRET_KEY,
       hostname: new URL(origin).hostname,
-      allowTestingKey: isLocalRuntime(env),
+      allowTestingKey: localRequest,
     })
 
     const response = await auth.handler(request)
@@ -253,8 +267,9 @@ async function handleAuthRequest(request, env, auth, dependencies) {
 export function createWorker(dependencies = {}) {
   return {
     async fetch(request, runtimeEnv) {
-      const { hostname, pathname } = new URL(request.url)
-      const branch = requestBranch(hostname, pathname, runtimeEnv)
+      const { pathname } = new URL(request.url)
+      const localRequest = isLocalRuntimeRequest(request, runtimeEnv)
+      const branch = requestBranch(request, runtimeEnv)
       if (!branch) {
         return Response.json(
           { error: { code: 'not_found', message: 'Not found.' } },
@@ -269,7 +284,7 @@ export function createWorker(dependencies = {}) {
       }
       try {
         env = validateEnv(runtimeEnv)
-        env = localRuntimeEnvironment(env)
+        env = localRuntimeEnvironment(env, localRequest)
       } catch (error) {
         return withCors(request, errorResponse(error), corsEnv)
       }
@@ -288,8 +303,8 @@ export function createWorker(dependencies = {}) {
           return withCors(request, new Response(null, { status: 204 }), env)
         }
 
-        if (pathname === '/v1/local-test/email-deliveries' && isLocalRuntime(env)) {
-          const response = localEmailCaptureResponse(request, localRuntimeEnvironment(env))
+        if (pathname === '/v1/local-test/email-deliveries' && localRequest) {
+          const response = localEmailCaptureResponse(request, env)
           if (response) return withCors(request, response, env)
         }
 
@@ -298,14 +313,14 @@ export function createWorker(dependencies = {}) {
           if (!route) {
             return withCors(request, errorResponse(new ApiError('not_found', 'Not found.', 404)), env)
           }
-          const authEnv = localRuntimeEnvironment(env)
-          const auth = createAuth(authEnv, { email: dependencies.email })
-          const response = await handleAuthRequest(request, authEnv, auth, dependencies)
+          const authEnv = env
+          const auth = createAuth(authEnv, { email: dependencies.email ?? (localRequest ? createLocalEmailCapture() : undefined) })
+          const response = await handleAuthRequest(request, authEnv, auth, dependencies, localRequest)
           return withCors(request, await sanitizeAuthResponse(response, route), env)
         }
 
         if (pathname === '/v1/session' && request.method === 'GET') {
-          const auth = createAuth(localRuntimeEnvironment(env), { email: dependencies.email })
+          const auth = createAuth(env, { email: dependencies.email ?? (localRequest ? createLocalEmailCapture() : undefined) })
           const session = await getSession(auth, request)
           return withCors(request, Response.json({
             user: session ? {
@@ -327,7 +342,7 @@ export function createWorker(dependencies = {}) {
           if (requiresMultipartAssetUpload(request) && !isMultipartContentType(request)) {
             return withCors(request, errorResponse(new ApiError('unsupported_media_type', 'Use multipart/form-data with a file field.', 415)), env)
           }
-          const auth = createAuth(localRuntimeEnvironment(env), { email: dependencies.email })
+          const auth = createAuth(env, { email: dependencies.email ?? (localRequest ? createLocalEmailCapture() : undefined) })
           const store = createD1Store({ db: env.DB })
           const assets = createAssetService({ bucket: env.MEDIA, db: env.DB, publicOrigin: env.PUBLIC_SITE_ORIGIN, apiOrigin: env.API_ORIGIN })
           const routes = createSiteRoutes({

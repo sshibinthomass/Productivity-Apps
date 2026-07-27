@@ -1,6 +1,6 @@
 import { env, createExecutionContext, waitOnExecutionContext } from 'cloudflare:test'
 import { describe, expect, it } from 'vitest'
-import worker, { localRuntimeEnvironment } from '../src/index.js'
+import worker, { isLocalRuntimeRequest, localRuntimeEnvironment } from '../src/index.js'
 import { validateEnv } from '../src/env.js'
 import { ApiError, errorResponse } from '../src/http/errors.js'
 import { createRouter } from '../src/http/router.js'
@@ -103,22 +103,29 @@ describe('HTTP runtime helpers', () => {
     expect(normalized.LOCAL_EMAIL_CAPTURE).toBe('true')
   })
 
-  it('rewrites every local runtime origin to the explicit loopback Worker origin', () => {
-    const local = localRuntimeEnvironment({
+  it('rewrites every local runtime origin to the explicit loopback Worker origin only for a local request', () => {
+    const local = {
       ...env,
       APP_ORIGIN: 'https://app.shibinthomas.com',
       API_ORIGIN: 'https://api.shibinthomas.com',
       PUBLIC_SITE_ORIGIN: 'https://links.shibinthomas.com',
       DEV_ORIGIN: 'http://127.0.0.1:4173',
       LOCAL_API_ORIGIN: 'http://127.0.0.1:8787',
-    })
+    }
 
-    expect(local).toMatchObject({
+    expect(localRuntimeEnvironment(local, true)).toMatchObject({
       APP_ORIGIN: 'http://127.0.0.1:4173',
       API_ORIGIN: 'http://127.0.0.1:8787',
       PUBLIC_SITE_ORIGIN: 'http://127.0.0.1:8787',
     })
-    expect(localRuntimeEnvironment(env).PUBLIC_SITE_ORIGIN).toBe(env.PUBLIC_SITE_ORIGIN)
+    expect(localRuntimeEnvironment(local, false).PUBLIC_SITE_ORIGIN).toBe('https://links.shibinthomas.com')
+    expect(localRuntimeEnvironment(env, false).PUBLIC_SITE_ORIGIN).toBe(env.PUBLIC_SITE_ORIGIN)
+  })
+
+  it('requires absent deployed Cloudflare request metadata before enabling the local runtime', () => {
+    const local = { ...env, DEV_ORIGIN: 'http://127.0.0.1:4173', LOCAL_API_ORIGIN: 'http://127.0.0.1:8787' }
+    expect(isLocalRuntimeRequest(new Request('http://127.0.0.1:8787/v1/health'), local)).toBe(true)
+    expect(isLocalRuntimeRequest(new Request('https://api.shibinthomas.com/v1/health', { headers: { 'CF-Ray': '1234-FRA' } }), local)).toBe(false)
   })
 
   it('rejects an environment with a missing required secret', () => {

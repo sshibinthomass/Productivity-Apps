@@ -176,6 +176,24 @@ describe('explicit local Worker routing', () => {
     await expect(response.json()).resolves.toEqual({ deliveries: [] })
   })
 
+  it('does not expose local helpers or local origins when a deployed request carries Cloudflare metadata', async () => {
+    const attackedRuntime = { ...localRuntime, LOCAL_EMAIL_CAPTURE: 'true' }
+    const deliveries = []
+    const attackWorker = createWorker({
+      verifyTurnstile: async () => undefined,
+      email: { sendVerification: async (message) => deliveries.push(message), sendPasswordReset: async (message) => deliveries.push(message) },
+    })
+    const headers = { Origin: devOrigin, 'CF-Ray': 'attack-FRA', 'Content-Type': 'application/json', 'X-Turnstile-Token': 'test-token', 'X-Consent-Version': '2026-07-26' }
+    const capture = await attackWorker.fetch(new Request('https://api.shibinthomas.com/v1/local-test/email-deliveries', { headers }), attackedRuntime, createExecutionContext())
+    const signUp = await attackWorker.fetch(new Request('https://api.shibinthomas.com/auth/sign-up/email', { method: 'POST', headers, body: JSON.stringify({ name: 'Attack', email: 'attack@example.com', password: 'long-enough-password' }) }), attackedRuntime, createExecutionContext())
+    const reset = await attackWorker.fetch(new Request('https://api.shibinthomas.com/auth/request-password-reset', { method: 'POST', headers, body: JSON.stringify({ email: 'attack@example.com' }) }), attackedRuntime, createExecutionContext())
+
+    expect(capture.status).toBe(404)
+    expect(signUp.status).toBe(403)
+    expect(reset.status).toBe(403)
+    expect(deliveries).toEqual([])
+  })
+
   it('routes local public slugs, public JSON, and public assets to the public host behavior', async () => {
     await seedPublishedSite()
     await env.MEDIA.put('public/local-site/3/avatar', new Uint8Array([137, 80, 78, 71]), {

@@ -110,10 +110,13 @@ describe('D1 mini-site store', () => {
 
   it('deletes only when the supplied name exactly matches the owned site', async () => {
     await create(store)
+    await env.DB.prepare('INSERT INTO analytics_link_clicks (site_id, block_id, click_count) VALUES (?, ?, ?)').bind('site-1', 'link-1', 3).run()
     await expect(store.delete({ userId: 'user-1', siteId: 'site-1', confirmationName: 'maya studio' })).resolves.toEqual({ code: 'name-mismatch' })
     await expect(store.delete({ userId: 'user-2', siteId: 'site-1', confirmationName: 'Maya Studio' })).resolves.toEqual({ code: 'not-found' })
+    await expect(env.DB.prepare('SELECT click_count FROM analytics_link_clicks WHERE site_id = ?').bind('site-1').first()).resolves.toEqual({ click_count: 3 })
     await expect(store.delete({ userId: 'user-1', siteId: 'site-1', confirmationName: 'Maya Studio' })).resolves.toEqual({ deleted: true })
     await expect(store.get({ userId: 'user-1', siteId: 'site-1' })).resolves.toBeNull()
+    await expect(env.DB.prepare('SELECT * FROM analytics_link_clicks WHERE site_id = ?').bind('site-1').first()).resolves.toBeNull()
   })
 
   it('leaves every record intact when the name changes immediately before the atomic delete batch', async () => {
@@ -151,10 +154,8 @@ describe('D1 mini-site store', () => {
   it('returns no more than thirty analytics days in ascending display order', async () => {
     await create(store)
     await env.DB.prepare('INSERT INTO analytics_summary (site_id, view_count, click_count) VALUES (?, ?, ?)').bind('site-1', 42, 7).run()
-    await env.DB.prepare(`INSERT INTO analytics_events (receipt_id, site_id, event_type, block_id, occurred_at, expires_at) VALUES
-      ('click-1', 'site-1', 'click', 'portfolio', '2026-07-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z'),
-      ('click-2', 'site-1', 'click', 'portfolio', '2026-07-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z'),
-      ('click-3', 'site-1', 'click', 'contact', '2026-07-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z')`).run()
+    await env.DB.prepare(`INSERT INTO analytics_link_clicks (site_id, block_id, click_count) VALUES
+      ('site-1', 'portfolio', 2), ('site-1', 'contact', 1)`).run()
     for (let index = 1; index <= 31; index += 1) {
       const day = new Date(Date.UTC(2026, 5, index)).toISOString().slice(0, 10)
       await env.DB.prepare('INSERT INTO analytics_days (site_id, day, view_count, click_count) VALUES (?, ?, ?, ?)').bind('site-1', day, index, index - 1).run()
