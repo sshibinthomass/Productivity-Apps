@@ -1,6 +1,6 @@
 import { env, createExecutionContext, waitOnExecutionContext } from 'cloudflare:test'
 import { describe, expect, it } from 'vitest'
-import worker from '../src/index.js'
+import worker, { localRuntimeEnvironment } from '../src/index.js'
 import { validateEnv } from '../src/env.js'
 import { ApiError, errorResponse } from '../src/http/errors.js'
 import { createRouter } from '../src/http/router.js'
@@ -89,6 +89,36 @@ describe('HTTP runtime helpers', () => {
 
     expect(normalized.APP_ORIGIN).toBe('https://app.shibinthomas.com')
     expect(normalized.DB).toBe(env.DB)
+  })
+
+  it('retains optional local runtime bindings when the platform exposes them as non-enumerable fields', () => {
+    const runtime = { ...env }
+    Object.defineProperties(runtime, {
+      DEV_ORIGIN: { enumerable: false, value: 'http://127.0.0.1:4173' },
+      LOCAL_EMAIL_CAPTURE: { enumerable: false, value: 'true' },
+    })
+
+    const normalized = validateEnv(runtime)
+    expect(normalized.DEV_ORIGIN).toBe('http://127.0.0.1:4173')
+    expect(normalized.LOCAL_EMAIL_CAPTURE).toBe('true')
+  })
+
+  it('rewrites every local runtime origin to the explicit loopback Worker origin', () => {
+    const local = localRuntimeEnvironment({
+      ...env,
+      APP_ORIGIN: 'https://app.shibinthomas.com',
+      API_ORIGIN: 'https://api.shibinthomas.com',
+      PUBLIC_SITE_ORIGIN: 'https://links.shibinthomas.com',
+      DEV_ORIGIN: 'http://127.0.0.1:4173',
+      LOCAL_API_ORIGIN: 'http://127.0.0.1:8787',
+    })
+
+    expect(local).toMatchObject({
+      APP_ORIGIN: 'http://127.0.0.1:4173',
+      API_ORIGIN: 'http://127.0.0.1:8787',
+      PUBLIC_SITE_ORIGIN: 'http://127.0.0.1:8787',
+    })
+    expect(localRuntimeEnvironment(env).PUBLIC_SITE_ORIGIN).toBe(env.PUBLIC_SITE_ORIGIN)
   })
 
   it('rejects an environment with a missing required secret', () => {

@@ -1,4 +1,5 @@
 import { createAuth } from './auth/createAuth.js'
+import { localEmailCaptureResponse } from './auth/localEmailCapture.js'
 import { enforceRateLimit } from './auth/rateLimit.js'
 import { getSession } from './auth/session.js'
 import { verifyTurnstile } from './auth/turnstile.js'
@@ -60,7 +61,16 @@ function localRequestBranch(pathname) {
   return 'api'
 }
 
+function isLocalRuntime(env) {
+  return isLocalDevelopmentOrigin(env?.DEV_ORIGIN)
+    && isLocalDevelopmentOrigin(env?.LOCAL_API_ORIGIN)
+}
+
 function requestBranch(hostname, pathname, runtimeEnv) {
+  if (isLocalRuntime(runtimeEnv)
+    && (isLocalRuntimeHostname(hostname) || hostname === 'api.shibinthomas.com' || hostname === 'links.shibinthomas.com')) {
+    return localRequestBranch(pathname)
+  }
   if (hostname === 'api.shibinthomas.com') return 'api'
   if (hostname === 'links.shibinthomas.com') return 'public'
   if (isLocalRuntimeHostname(hostname) && isLocalDevelopmentOrigin(runtimeEnv?.DEV_ORIGIN)) {
@@ -69,12 +79,13 @@ function requestBranch(hostname, pathname, runtimeEnv) {
   return null
 }
 
-function authEnvironment(request, hostname, env) {
-  if (!isLocalRuntimeHostname(hostname) || !isLocalDevelopmentOrigin(env.DEV_ORIGIN)) return env
+export function localRuntimeEnvironment(env) {
+  if (!isLocalRuntime(env)) return env
   return {
     ...env,
     APP_ORIGIN: env.DEV_ORIGIN,
-    API_ORIGIN: new URL(request.url).origin,
+    API_ORIGIN: env.LOCAL_API_ORIGIN,
+    PUBLIC_SITE_ORIGIN: env.LOCAL_API_ORIGIN,
   }
 }
 
@@ -226,6 +237,7 @@ async function handleAuthRequest(request, env, auth, dependencies) {
       token: request.headers.get('X-Turnstile-Token'),
       secret: env.TURNSTILE_SECRET_KEY,
       hostname: new URL(origin).hostname,
+      allowTestingKey: isLocalRuntime(env),
     })
 
     const response = await auth.handler(request)
@@ -257,13 +269,14 @@ export function createWorker(dependencies = {}) {
       }
       try {
         env = validateEnv(runtimeEnv)
+        env = localRuntimeEnvironment(env)
       } catch (error) {
         return withCors(request, errorResponse(error), corsEnv)
       }
 
       try {
         if (branch === 'public') {
-          const assets = createAssetService({ bucket: env.MEDIA, db: env.DB, publicOrigin: env.PUBLIC_SITE_ORIGIN })
+          const assets = createAssetService({ bucket: env.MEDIA, db: env.DB, publicOrigin: env.PUBLIC_SITE_ORIGIN, apiOrigin: env.API_ORIGIN })
           const analytics = createAnalyticsService({ db: env.DB, rateLimitKey: env.BETTER_AUTH_SECRET })
           const routes = createPublicRoutes({
             db: env.DB, assets, analytics, staticAssets: env.ASSETS, origin: env.PUBLIC_SITE_ORIGIN,
@@ -275,19 +288,24 @@ export function createWorker(dependencies = {}) {
           return withCors(request, new Response(null, { status: 204 }), env)
         }
 
+        if (pathname === '/v1/local-test/email-deliveries' && isLocalRuntime(env)) {
+          const response = localEmailCaptureResponse(request, localRuntimeEnvironment(env))
+          if (response) return withCors(request, response, env)
+        }
+
         if (pathname.startsWith('/auth/')) {
           const route = authRoute(request.method, pathname)
           if (!route) {
             return withCors(request, errorResponse(new ApiError('not_found', 'Not found.', 404)), env)
           }
-          const authEnv = authEnvironment(request, hostname, env)
+          const authEnv = localRuntimeEnvironment(env)
           const auth = createAuth(authEnv, { email: dependencies.email })
           const response = await handleAuthRequest(request, authEnv, auth, dependencies)
           return withCors(request, await sanitizeAuthResponse(response, route), env)
         }
 
         if (pathname === '/v1/session' && request.method === 'GET') {
-          const auth = createAuth(authEnvironment(request, hostname, env), { email: dependencies.email })
+          const auth = createAuth(localRuntimeEnvironment(env), { email: dependencies.email })
           const session = await getSession(auth, request)
           return withCors(request, Response.json({
             user: session ? {
@@ -309,9 +327,9 @@ export function createWorker(dependencies = {}) {
           if (requiresMultipartAssetUpload(request) && !isMultipartContentType(request)) {
             return withCors(request, errorResponse(new ApiError('unsupported_media_type', 'Use multipart/form-data with a file field.', 415)), env)
           }
-          const auth = createAuth(authEnvironment(request, hostname, env), { email: dependencies.email })
+          const auth = createAuth(localRuntimeEnvironment(env), { email: dependencies.email })
           const store = createD1Store({ db: env.DB })
-          const assets = createAssetService({ bucket: env.MEDIA, db: env.DB, publicOrigin: env.PUBLIC_SITE_ORIGIN })
+          const assets = createAssetService({ bucket: env.MEDIA, db: env.DB, publicOrigin: env.PUBLIC_SITE_ORIGIN, apiOrigin: env.API_ORIGIN })
           const routes = createSiteRoutes({
             auth,
             store,
@@ -334,7 +352,7 @@ export function createWorker(dependencies = {}) {
 
     async scheduled(_event, runtimeEnv, context) {
       const env = validateEnv(runtimeEnv)
-      const assets = createAssetService({ bucket: env.MEDIA, db: env.DB, publicOrigin: env.PUBLIC_SITE_ORIGIN })
+      const assets = createAssetService({ bucket: env.MEDIA, db: env.DB, publicOrigin: env.PUBLIC_SITE_ORIGIN, apiOrigin: env.API_ORIGIN })
       const cleanup = createAnalyticsService({ db: env.DB, rateLimitKey: env.BETTER_AUTH_SECRET }).cleanup({ assets })
       if (context?.waitUntil) context.waitUntil(cleanup)
       else await cleanup

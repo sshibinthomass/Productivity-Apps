@@ -151,6 +151,10 @@ describe('D1 mini-site store', () => {
   it('returns no more than thirty analytics days in ascending display order', async () => {
     await create(store)
     await env.DB.prepare('INSERT INTO analytics_summary (site_id, view_count, click_count) VALUES (?, ?, ?)').bind('site-1', 42, 7).run()
+    await env.DB.prepare(`INSERT INTO analytics_events (receipt_id, site_id, event_type, block_id, occurred_at, expires_at) VALUES
+      ('click-1', 'site-1', 'click', 'portfolio', '2026-07-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z'),
+      ('click-2', 'site-1', 'click', 'portfolio', '2026-07-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z'),
+      ('click-3', 'site-1', 'click', 'contact', '2026-07-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z')`).run()
     for (let index = 1; index <= 31; index += 1) {
       const day = new Date(Date.UTC(2026, 5, index)).toISOString().slice(0, 10)
       await env.DB.prepare('INSERT INTO analytics_days (site_id, day, view_count, click_count) VALUES (?, ?, ?, ?)').bind('site-1', day, index, index - 1).run()
@@ -158,6 +162,7 @@ describe('D1 mini-site store', () => {
 
     const analytics = await store.getAnalytics({ userId: 'user-1', siteId: 'site-1' })
     expect(analytics.summary).toEqual({ totalViews: 42, totalClicks: 7 })
+    expect(analytics.linkClicks).toEqual({ portfolio: 2, contact: 1 })
     expect(analytics.days).toHaveLength(30)
     expect(analytics.days[0]).toEqual({ date: '2026-06-02', views: 2, clicks: 1 })
     expect(analytics.days.at(-1)).toEqual({ date: '2026-07-01', views: 31, clicks: 30 })

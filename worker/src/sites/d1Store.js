@@ -199,9 +199,12 @@ export function createD1Store({ db } = {}) {
 
     async getAnalytics({ userId, siteId }) {
       if (!(await get({ userId, siteId }))) return { code: 'not-found' }
-      const [summaryRow, daysResult] = await db.batch([
+      const [summaryRow, daysResult, linkResult] = await db.batch([
         db.prepare('SELECT view_count, click_count FROM analytics_summary WHERE site_id = ?1 LIMIT 1').bind(siteId),
         db.prepare('SELECT day, view_count, click_count FROM analytics_days WHERE site_id = ?1 ORDER BY day DESC LIMIT 30').bind(siteId),
+        db.prepare(`SELECT block_id, COUNT(*) AS click_count FROM analytics_events
+          WHERE site_id = ?1 AND event_type = 'click' AND block_id IS NOT NULL
+          GROUP BY block_id`).bind(siteId),
       ])
       return {
         summary: {
@@ -209,7 +212,7 @@ export function createD1Store({ db } = {}) {
           totalClicks: summaryRow.results[0]?.click_count ?? 0,
         },
         days: daysResult.results.reverse().map((row) => ({ date: row.day, views: row.view_count, clicks: row.click_count })),
-        linkClicks: {},
+        linkClicks: Object.fromEntries(linkResult.results.map((row) => [row.block_id, row.click_count])),
       }
     },
   }

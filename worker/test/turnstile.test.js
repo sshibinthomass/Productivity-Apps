@@ -49,6 +49,29 @@ describe('verifyTurnstile', () => {
     ).rejects.toMatchObject(challengeError)
   })
 
+  it('accepts Cloudflare’s documented test-key marker only when explicitly enabled for local verification', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(Response.json({
+      success: true,
+      hostname: 'example.com',
+      metadata: { result_with_testing_key: true },
+    }))
+
+    await expect(verifyTurnstile({
+      token: 'XXXX.DUMMY.TOKEN.XXXX',
+      secret: '1x0000000000000000000000000000000AA',
+      hostname: '127.0.0.1',
+      allowTestingKey: true,
+      fetchImpl,
+    })).resolves.toBeUndefined()
+
+    await expect(verifyTurnstile({
+      token: 'XXXX.DUMMY.TOKEN.XXXX',
+      secret: '1x0000000000000000000000000000000AA',
+      hostname: '127.0.0.1',
+      fetchImpl,
+    })).rejects.toMatchObject(challengeError)
+  })
+
   it('maps a Turnstile network failure to the stable challenge error', async () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error('Cloudflare connection refused'))
 

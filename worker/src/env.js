@@ -8,6 +8,8 @@ const requiredStringBindings = [
   'RESEND_API_KEY',
 ]
 
+const optionalStringBindings = ['DEV_ORIGIN', 'LOCAL_API_ORIGIN', 'LOCAL_EMAIL_CAPTURE']
+
 export function validateEnv(env) {
   const normalized = { ...env }
 
@@ -16,6 +18,10 @@ export function validateEnv(env) {
       throw new Error(`Missing required environment variable: ${name}`)
     }
     normalized[name] = env[name].trim()
+  }
+
+  for (const name of optionalStringBindings) {
+    if (typeof env[name] === 'string') normalized[name] = env[name]
   }
 
   return normalized

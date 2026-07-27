@@ -7,7 +7,7 @@ const challengeError = () => new ApiError(
   400,
 )
 
-export async function verifyTurnstile({ token, secret, hostname, fetchImpl = fetch }) {
+export async function verifyTurnstile({ token, secret, hostname, allowTestingKey = false, fetchImpl = fetch }) {
   if (typeof token !== 'string' || token.trim() === '') {
     throw challengeError()
   }
@@ -21,7 +21,9 @@ export async function verifyTurnstile({ token, secret, hostname, fetchImpl = fet
     })
     const result = await response.json()
 
-    if (!response.ok || result.success !== true || result.hostname !== hostname) {
+    const acceptedHostname = result.hostname === hostname
+      || (allowTestingKey === true && result.metadata?.result_with_testing_key === true)
+    if (!response.ok || result.success !== true || !acceptedHostname) {
       throw challengeError()
     }
   } catch (error) {

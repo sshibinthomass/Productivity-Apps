@@ -21,6 +21,12 @@ describe('application bootstrap host boundary', () => {
     expect(isPublicMiniSiteHost(host)).toBe(false)
   })
 
+  it('recognizes a Worker-rendered public page on a loopback development origin', () => {
+    expect(isPublicMiniSiteHost('127.0.0.1:8787', {
+      getElementById: (id) => id === 'mini-site-bootstrap' ? {} : null,
+    })).toBe(true)
+  })
+
   it('does not mount the auth boundary or management routes on the public host', () => {
     const authMount = vi.fn()
     function AuthBoundary({ children }) {

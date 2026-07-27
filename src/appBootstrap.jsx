@@ -6,13 +6,14 @@ import ThemeProvider from './theme/ThemeProvider.jsx'
 
 export function ApplicationShell({
   host = globalThis.location?.host,
+  document = globalThis.document,
   routerBase,
   RouterComponent = BrowserRouter,
   routerProps,
   AuthBoundary = AuthProvider,
   AppComponent = App,
 }) {
-  const isPublicHost = isPublicMiniSiteHost(host)
+  const isPublicHost = isPublicMiniSiteHost(host, document)
   const application = <AppComponent isPublicHost={isPublicHost} />
 
   return (

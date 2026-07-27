@@ -72,6 +72,20 @@ describe('R2 mini-site assets', () => {
     expect(uploaded).toMatchObject({ assetId: expect.any(String), storagePath: `drafts/owner-1/site-1/${uploaded.assetId}`, url: `${apiOrigin}/v1/sites/site-1/assets/${uploaded.assetId}` })
   })
 
+  it('uses the configured API origin for private draft asset URLs', async () => {
+    const localAssets = createAssetService({
+      bucket: env.MEDIA,
+      db: env.DB,
+      publicOrigin: 'http://127.0.0.1:8787',
+      apiOrigin: 'http://127.0.0.1:8787',
+      createId: () => 'local-asset',
+    })
+
+    await expect(localAssets.uploadDraft({ userId: 'owner-1', siteId: 'site-1', file: file() })).resolves.toMatchObject({
+      url: 'http://127.0.0.1:8787/v1/sites/site-1/assets/local-asset',
+    })
+  })
+
   it('rejects a PNG label with non-PNG bytes', async () => {
     await expect(assets.uploadDraft({ userId: 'owner-1', siteId: 'site-1', file: file(jpeg, 'image/png') })).rejects.toMatchObject({ code: 'invalid_asset' })
   })

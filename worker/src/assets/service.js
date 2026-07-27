@@ -95,7 +95,7 @@ function contentDisposition(assetId) {
   return `inline; filename="${assetId}"`
 }
 
-export function createAssetService({ bucket, db, publicOrigin, createId = () => crypto.randomUUID(), beforePublicDelete } = {}) {
+export function createAssetService({ bucket, db, publicOrigin, apiOrigin = 'https://api.shibinthomas.com', createId = () => crypto.randomUUID(), beforePublicDelete } = {}) {
   if (!bucket) throw new TypeError('An R2 bucket is required.')
   if (!db) throw new TypeError('A D1 database is required.')
   if (!publicOrigin) throw new TypeError('A public asset origin is required.')
@@ -131,7 +131,7 @@ export function createAssetService({ bucket, db, publicOrigin, createId = () => 
       await bucket.delete(objectKey)
       throw error
     }
-    return { assetId, storagePath: objectKey, url: `https://api.shibinthomas.com/v1/sites/${encodeURIComponent(siteId)}/assets/${encodeURIComponent(assetId)}` }
+    return { assetId, storagePath: objectKey, url: `${apiOrigin}/v1/sites/${encodeURIComponent(siteId)}/assets/${encodeURIComponent(assetId)}` }
   }
 
   async function getDraft({ userId, siteId, assetId } = {}) {

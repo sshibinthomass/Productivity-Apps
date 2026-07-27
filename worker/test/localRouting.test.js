@@ -4,7 +4,7 @@ import { createWorker } from '../src/index.js'
 import { resetDatabase } from './support/database.js'
 
 const devOrigin = 'http://localhost:5173'
-const localRuntime = { ...env, DEV_ORIGIN: devOrigin }
+const localRuntime = { ...env, DEV_ORIGIN: devOrigin, LOCAL_API_ORIGIN: 'http://localhost:8787' }
 
 function request(host, path, options = {}) {
   const headers = new Headers(options.headers)
@@ -121,6 +121,59 @@ describe('explicit local Worker routing', () => {
     await expect(session.json()).resolves.toMatchObject({ user: { email: 'verified-local@example.com' } })
     expect(site.status).toBe(201)
     expect(verificationCookie).toContain('better-auth')
+  })
+
+  it('captures verification links only in an explicitly enabled local development runtime', async () => {
+    const capturedRuntime = { ...localRuntime, LOCAL_EMAIL_CAPTURE: 'true' }
+    const captureWorker = createWorker({ verifyTurnstile: async () => undefined })
+
+    const clear = await captureWorker.fetch(request('localhost:8787', '/v1/local-test/email-deliveries', {
+      method: 'DELETE',
+    }), capturedRuntime, createExecutionContext())
+    const signUp = await captureWorker.fetch(request('localhost:8787', '/auth/sign-up/email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Turnstile-Token': 'test-token',
+        'X-Consent-Version': '2026-07-26',
+      },
+      body: JSON.stringify({ name: 'Captured Local', email: 'captured-local@example.com', password: 'long-enough-password' }),
+    }), capturedRuntime, createExecutionContext())
+    const deliveries = await captureWorker.fetch(request('localhost:8787', '/v1/local-test/email-deliveries'), capturedRuntime, createExecutionContext())
+
+    expect(clear.status).toBe(204)
+    expect(signUp.status).toBe(200)
+    expect(deliveries.status).toBe(200)
+    await expect(deliveries.json()).resolves.toEqual({
+      deliveries: [expect.objectContaining({
+        type: 'verification',
+        email: 'captured-local@example.com',
+        url: expect.stringContaining('http://localhost:8787/auth/verify-email?token='),
+      })],
+    })
+  })
+
+  it('keeps explicitly configured local authentication helpers available when Wrangler rewrites a custom-domain request URL', async () => {
+    const capturedRuntime = {
+      ...env,
+      DEV_ORIGIN: devOrigin,
+      LOCAL_API_ORIGIN: 'http://127.0.0.1:8787',
+      LOCAL_EMAIL_CAPTURE: 'true',
+    }
+    const clear = await worker.fetch(
+      new Request('https://api.shibinthomas.com/v1/local-test/email-deliveries', { method: 'DELETE', headers: { Origin: devOrigin } }),
+      capturedRuntime,
+      createExecutionContext(),
+    )
+    const response = await worker.fetch(
+      new Request('https://api.shibinthomas.com/v1/local-test/email-deliveries', { headers: { Origin: devOrigin } }),
+      capturedRuntime,
+      createExecutionContext(),
+    )
+
+    expect(clear.status).toBe(204)
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ deliveries: [] })
   })
 
   it('routes local public slugs, public JSON, and public assets to the public host behavior', async () => {
