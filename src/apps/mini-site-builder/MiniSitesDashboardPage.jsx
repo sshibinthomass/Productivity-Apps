@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../../auth/authContext.js'
 import { SITE_LIMIT } from './model/miniSiteModel.js'
 import { useMiniSiteRepository } from './data/repositoryContext.js'
+import { publicMiniSiteUrl } from './data/miniSiteRepository.js'
 import './MiniSiteBuilder.css'
 
 function siteStatus(site) {
@@ -209,14 +210,16 @@ export default function MiniSitesDashboardPage() {
                   <div>
                     <p className="mini-dashboard__status">{siteStatus(site)}</p>
                     <h2>{site.name}</h2>
-                    <p>/s/{site.slug}</p>
+                    <p>{publicMiniSiteUrl(site.slug)}</p>
                   </div>
-                  <Link
-                    to={`/s/${site.slug}`}
+                  <a
+                    href={publicMiniSiteUrl(site.slug)}
                     aria-label={`Open ${site.name} public site`}
+                    target="_blank"
+                    rel="noreferrer"
                   >
                     ↗
-                  </Link>
+                  </a>
                 </div>
                 <dl className="mini-dashboard__metrics">
                   <div>

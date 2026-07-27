@@ -53,7 +53,7 @@ describe('MiniSitesDashboardPage', () => {
       screen
         .getByRole('link', { name: 'Open Maya Studio public site' })
         .getAttribute('href'),
-    ).toBe('/s/maya-studio')
+    ).toBe('https://links.shibinthomas.com/maya-studio')
   })
 
   it('disables new and duplicate actions at the five-site limit', async () => {

@@ -14,7 +14,7 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-function renderAt(path, registry, repository) {
+function renderAt(path, registry, repository, options = {}) {
   useAuth.mockReturnValue({
     user: null,
     isAuthLoading: false,
@@ -29,7 +29,7 @@ function renderAt(path, registry, repository) {
     signOutUser: vi.fn(),
   })
 
-  const app = <App registry={registry} />
+  const app = <App registry={registry} {...options} />
   return render(
     <MemoryRouter initialEntries={[path]}>
       <ThemeProvider>
@@ -120,7 +120,19 @@ describe('App authentication routes', () => {
     ).toBeTruthy()
   })
 
-  it('renders public mini-sites outside the Arvenilo application layout', async () => {
+  it('redirects legacy public URLs to the canonical public hostname', () => {
+    const redirect = vi.fn()
+
+    renderAt('/s/maya-studio', undefined, undefined, {
+      legacyRedirect: redirect,
+    })
+
+    expect(redirect).toHaveBeenCalledWith(
+      'https://links.shibinthomas.com/maya-studio',
+    )
+  })
+
+  it('renders public-host mini-sites outside the Arvenilo application layout', async () => {
     const repository = {
       getPublished: vi.fn().mockResolvedValue({
         slug: 'maya-studio',
@@ -143,7 +155,7 @@ describe('App authentication routes', () => {
       recordEvent: vi.fn().mockResolvedValue({ recorded: true }),
     }
 
-    renderAt('/s/maya-studio', undefined, repository)
+    renderAt('/maya-studio', undefined, repository, { isPublicHost: true })
 
     expect(
       await screen.findByRole('heading', { name: 'Maya Studio' }),

@@ -244,8 +244,8 @@ describe('MiniSiteStudioPage', () => {
     await waitFor(() =>
       expect(repository.publishSite).toHaveBeenCalledWith('site-1'),
     )
-    expect(screen.getByRole('link', { name: 'View public site' }).href).toContain(
-      '/s/maya-links',
+    expect(screen.getByRole('link', { name: 'View public site' }).href).toBe(
+      'https://links.shibinthomas.com/maya-links',
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Unpublish site' }))

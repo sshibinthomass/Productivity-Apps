@@ -1,4 +1,5 @@
-import { Route, Routes } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Route, Routes, useParams } from 'react-router-dom'
 import ProtectedRoute from './auth/ProtectedRoute.jsx'
 import Layout from './components/Layout.jsx'
 import { appRegistry, isRoutableApp } from './config/appRegistry.jsx'
@@ -14,13 +15,51 @@ import NotFoundPage from './pages/NotFoundPage.jsx'
 import PublicMiniSitePage from './apps/mini-site-builder/PublicMiniSitePage.jsx'
 import NewMiniSitePage from './apps/mini-site-builder/NewMiniSitePage.jsx'
 import MiniSiteStudioPage from './apps/mini-site-builder/studio/MiniSiteStudioPage.jsx'
+import { publicMiniSiteUrl } from './apps/mini-site-builder/data/miniSiteRepository.js'
 
-export default function App({ registry = appRegistry }) {
+function LegacyPublicSiteRedirect({ redirect }) {
+  const { slug } = useParams()
+
+  useEffect(() => {
+    redirect(publicMiniSiteUrl(slug))
+  }, [redirect, slug])
+
+  return null
+}
+
+function PublicHostNotFound() {
+  return (
+    <main className="mini-site-public-state">
+      <div>
+        <p>404 / MINI-SITE</p>
+        <h1>This mini-site is not live.</h1>
+      </div>
+    </main>
+  )
+}
+
+export default function App({
+  registry = appRegistry,
+  isPublicHost = globalThis.location?.hostname === 'links.shibinthomas.com',
+  legacyRedirect = (url) => globalThis.location.replace(url),
+}) {
   const routableApps = registry.filter(isRoutableApp)
+
+  if (isPublicHost) {
+    return (
+      <Routes>
+        <Route path="/:slug" element={<PublicMiniSitePage />} />
+        <Route path="*" element={<PublicHostNotFound />} />
+      </Routes>
+    )
+  }
 
   return (
     <Routes>
-      <Route path="/s/:slug" element={<PublicMiniSitePage />} />
+      <Route
+        path="/s/:slug"
+        element={<LegacyPublicSiteRedirect redirect={legacyRedirect} />}
+      />
       <Route element={<Layout />}>
         <Route index element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />

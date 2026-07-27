@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { publicMiniSiteUrl, publicSiteBaseUrl } from '../data/miniSiteRepository.js'
 
 function SettingsField({ label, children }) {
   return (
@@ -46,7 +46,7 @@ export default function SettingsPanel({
         </SettingsField>
         <SettingsField label="Public slug">
           <div className="mini-settings__slug">
-            <span>/s/</span>
+            <span>{publicSiteBaseUrl.replace(/\/+$/, '')}/</span>
             <input
               aria-label="Public slug"
               value={slugInput}
@@ -110,9 +110,9 @@ export default function SettingsPanel({
         <div>
           {status === 'published' ? (
             <>
-              <Link to={`/s/${slug}`} target="_blank" rel="noreferrer">
+              <a href={publicMiniSiteUrl(slug)} target="_blank" rel="noreferrer">
                 View public site
-              </Link>
+              </a>
               {hasUnpublishedChanges && (
                 <button
                   type="button"

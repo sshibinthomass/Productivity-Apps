@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMiniSiteRepository } from './data/repositoryContext.js'
+import { publicSiteBaseUrl } from './data/miniSiteRepository.js'
 import { TEMPLATES } from './model/templates.js'
 import { normalizeSlug, validateSlug } from './model/validation.js'
 import { themeToCssVariables } from './model/themeCss.js'
@@ -109,7 +110,7 @@ export default function NewMiniSitePage() {
           <label>
             Public slug
             <span className="mini-create__slug">
-              <span>/s/</span>
+              <span>{publicSiteBaseUrl.replace(/\/+$/, '')}/</span>
               <input
                 aria-label="Public slug"
                 value={slug}

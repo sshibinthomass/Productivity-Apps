@@ -1,6 +1,14 @@
 import { createApiClient } from '../../../api/apiClient.js'
 import { normalizeDraft } from '../model/miniSiteModel.js'
 
+export const publicSiteBaseUrl =
+  import.meta.env.VITE_PUBLIC_SITE_BASE_URL ?? 'https://links.shibinthomas.com'
+
+export function publicMiniSiteUrl(slug) {
+  const baseUrl = publicSiteBaseUrl.replace(/\/+$/, '')
+  return slug ? `${baseUrl}/${encodeURIComponent(slug)}` : baseUrl
+}
+
 function segment(value) {
   return encodeURIComponent(String(value))
 }
@@ -106,7 +114,7 @@ const managementApi = createApiClient({
   baseUrl: import.meta.env.VITE_API_BASE_URL ?? 'https://api.shibinthomas.com',
 })
 const publicApi = createApiClient({
-  baseUrl: import.meta.env.VITE_PUBLIC_SITE_BASE_URL ?? 'https://links.shibinthomas.com',
+  baseUrl: publicSiteBaseUrl,
 })
 
 export const miniSiteRepository = createMiniSiteRepository(managementApi, { publicApi })
