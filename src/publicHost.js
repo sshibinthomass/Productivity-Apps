@@ -1,14 +1,14 @@
 export const publicMiniSiteHost = 'links.shibinthomas.com'
 
-function loopbackHost(host) {
+function exactHostname(host) {
   const value = String(host ?? '').toLowerCase()
-  const hostname = value.startsWith('[') ? value.slice(0, value.indexOf(']') + 1) : value.split(':')[0]
-  return ['localhost', '127.0.0.1', '[::1]'].includes(hostname)
+  const ipv6 = /^\[::1\](?::\d+)?$/.exec(value)
+  if (ipv6) return '[::1]'
+  return /^([a-z0-9.-]+)(?::\d+)?$/.exec(value)?.[1] ?? null
 }
 
 export function isPublicMiniSiteHost(host, document = globalThis.document) {
-  const value = String(host ?? '').toLowerCase()
-  const hostname = value.startsWith('[') ? value.slice(0, value.indexOf(']') + 1) : value.split(':')[0]
+  const hostname = exactHostname(host)
   return hostname === publicMiniSiteHost
-    || (loopbackHost(hostname) && Boolean(document?.getElementById?.('mini-site-bootstrap')))
+    || (['localhost', '127.0.0.1', '[::1]'].includes(hostname) && Boolean(document?.getElementById?.('mini-site-bootstrap')))
 }

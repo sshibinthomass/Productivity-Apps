@@ -194,6 +194,16 @@ describe('explicit local Worker routing', () => {
     expect(deliveries).toEqual([])
   })
 
+  it('does not locally route a loopback URL when deployed Cloudflare metadata is present', async () => {
+    const attackedRuntime = { ...localRuntime, LOCAL_EMAIL_CAPTURE: 'true' }
+    const headers = { Origin: devOrigin, 'CF-Ray': 'attack-FRA' }
+    const health = await worker.fetch(new Request('http://127.0.0.1:8787/v1/health', { headers }), attackedRuntime, createExecutionContext())
+    const capture = await worker.fetch(new Request('http://127.0.0.1:8787/v1/local-test/email-deliveries', { headers }), attackedRuntime, createExecutionContext())
+
+    expect(health.status).not.toBe(200)
+    expect(capture.status).toBe(404)
+  })
+
   it('routes local public slugs, public JSON, and public assets to the public host behavior', async () => {
     await seedPublishedSite()
     await env.MEDIA.put('public/local-site/3/avatar', new Uint8Array([137, 80, 78, 71]), {

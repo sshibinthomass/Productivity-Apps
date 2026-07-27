@@ -81,9 +81,6 @@ function requestBranch(request, runtimeEnv) {
   }
   if (hostname === 'api.shibinthomas.com') return 'api'
   if (hostname === 'links.shibinthomas.com') return 'public'
-  if (isLocalRuntimeHostname(hostname) && isLocalDevelopmentOrigin(runtimeEnv?.DEV_ORIGIN)) {
-    return localRequestBranch(pathname)
-  }
   return null
 }
 

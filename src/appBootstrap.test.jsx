@@ -34,6 +34,11 @@ describe('application bootstrap host boundary', () => {
     expect(isPublicMiniSiteHost('attacker.example', {
       getElementById: (id) => id === 'mini-site-bootstrap' ? {} : null,
     })).toBe(false)
+    for (const host of ['[::1]attacker.example', '[::1]anything', '[::1]:8787.attacker']) {
+      expect(isPublicMiniSiteHost(host, {
+        getElementById: (id) => id === 'mini-site-bootstrap' ? {} : null,
+      })).toBe(false)
+    }
   })
 
   it('does not mount the auth boundary or management routes on the public host', () => {
