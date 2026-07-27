@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { useAuth } from '../auth/authContext.js'
 import ResetPasswordPage from './ResetPasswordPage.jsx'
@@ -26,14 +26,25 @@ describe('ResetPasswordPage', () => {
     expect(screen.getByRole('button', { name: 'Set new password' }).disabled).toBe(true)
   })
 
-  it('replaces the reset URL with login after a successful Better Auth reset', async () => {
+  it('handles an error-only Better Auth invalid-token callback', () => {
+    useAuth.mockReturnValue({ authError: null, resetPassword: vi.fn() })
+    render(<MemoryRouter initialEntries={['/reset-password?error=INVALID_TOKEN']}><ResetPasswordPage /></MemoryRouter>)
+
+    expect(screen.getByRole('alert').textContent).toContain('expired or invalid')
+    expect(screen.getByRole('button', { name: 'Set new password' }).disabled).toBe(true)
+  })
+
+  it('replaces the reset history entry with login after a successful Better Auth reset', async () => {
     useAuth.mockReturnValue({ authError: null, resetPassword: vi.fn().mockResolvedValue({ status: true }) })
-    render(<MemoryRouter initialEntries={['/reset-password?token=opaque']}><Routes><Route path="/reset-password" element={<ResetPasswordPage />} /><Route path="/login" element={<p>Login destination</p>} /></Routes></MemoryRouter>)
+    function LoginDestination() { const navigate = useNavigate(); return <><p>Login destination</p><button type="button" onClick={() => navigate(-1)}>Back</button></> }
+    render(<MemoryRouter initialEntries={['/before', '/reset-password?token=opaque']} initialIndex={1}><Routes><Route path="/before" element={<p>Before reset</p>} /><Route path="/reset-password" element={<ResetPasswordPage />} /><Route path="/login" element={<LoginDestination />} /></Routes></MemoryRouter>)
     fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'long-password' } })
     fireEvent.change(screen.getByLabelText('Confirm new password'), { target: { value: 'long-password' } })
     fireEvent.click(screen.getByRole('button', { name: 'Set new password' }))
 
     await waitFor(() => expect(screen.getByText('Login destination')).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(screen.getByText('Before reset')).toBeTruthy()
   })
 
   it('focuses the new password when it is too short', () => {

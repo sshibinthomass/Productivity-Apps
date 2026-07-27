@@ -89,7 +89,7 @@ export default function TurnstileWidget({ onVerify, resetKey = 0 }) {
   return (
     <div className="turnstile-widget">
       <div ref={container} aria-label="Security check" />
-      {error && <p className="turnstile-widget__error" role="alert">{error} <button type="button" onClick={retry}>Retry security check</button></p>}
+      {error && <p className="turnstile-widget__error" role="alert">{error} {siteKey && <button type="button" onClick={retry}>Retry security check</button>}</p>}
     </div>
   )
 }

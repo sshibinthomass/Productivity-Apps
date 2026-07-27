@@ -26,6 +26,7 @@ describe('ForgotPasswordPage', () => {
     fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'person@example.com' } })
     fireEvent.click(screen.getByRole('button', { name: 'Complete security check' }))
     fireEvent.click(screen.getByRole('button', { name: 'Send reset link' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Sending reset link…' }))
 
     expect(requestPasswordReset).toHaveBeenCalledTimes(1)
     expect(screen.getByRole('button', { name: 'Sending reset link…' }).disabled).toBe(true)

@@ -85,6 +85,7 @@ describe('LoginPage', () => {
 
     expect(document.activeElement).toBe(screen.getByLabelText('Email address'))
     expect(signInWithEmail).not.toHaveBeenCalled()
+    expect(screen.getAllByRole('button', { name: 'Sign in' }).at(-1).disabled).toBe(false)
   })
 
   it('creates an email account after consent and sends the creator to verification', async () => {

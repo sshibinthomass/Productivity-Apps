@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import PrivacyPage from './PrivacyPage.jsx'
 import TermsPage from './TermsPage.jsx'
@@ -13,9 +13,11 @@ describe('registration legal pages', () => {
     expect(contacts[0].getAttribute('href')).toBe('https://shibinthomas.com/')
   })
 
-  it('preserves registration intent when returning from terms', () => {
-    render(<MemoryRouter initialEntries={[{ pathname: '/terms', state: { authMode: 'register' } }]}><Routes><Route path="/terms" element={<TermsPage />} /><Route path="/login" element={<p>Registration return</p>} /></Routes></MemoryRouter>)
+  it('preserves registration intent in location state when returning from terms', () => {
+    function LoginState() { return <output>{useLocation().state?.authMode || 'none'}</output> }
+    render(<MemoryRouter initialEntries={[{ pathname: '/terms', state: { authMode: 'register' } }]}><Routes><Route path="/terms" element={<TermsPage />} /><Route path="/login" element={<LoginState />} /></Routes></MemoryRouter>)
     const back = screen.getByRole('link', { name: 'Back to account creation' })
-    expect(back.getAttribute('href')).toBe('/login')
+    fireEvent.click(back)
+    expect(screen.getByText('register')).toBeTruthy()
   })
 })

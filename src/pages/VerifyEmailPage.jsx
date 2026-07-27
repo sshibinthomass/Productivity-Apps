@@ -21,8 +21,12 @@ export default function VerifyEmailPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const emailRef = useRef(null)
   const timerRef = useRef(null)
+  const mountedRef = useRef(true)
+  const attemptRef = useRef(0)
 
   useEffect(() => () => {
+    mountedRef.current = false
+    attemptRef.current += 1
     if (timerRef.current) window.clearInterval(timerRef.current)
   }, [])
 
@@ -40,9 +44,10 @@ export default function VerifyEmailPage() {
     setTurnstileReset((value) => value + 1)
     if (!submittedToken) return
     setIsSubmitting(true)
+    const attempt = ++attemptRef.current
     try {
       const result = await resendVerification({ email: email.trim(), turnstileToken: submittedToken, callbackURL: `${window.location.origin}/login` })
-      if (!result) return
+      if (!result || !mountedRef.current || attempt !== attemptRef.current) return
       setMessage('Verification email sent. Check your inbox, then sign in.')
       setCooldown(resendDelay)
       timerRef.current = window.setInterval(() => {
@@ -56,7 +61,7 @@ export default function VerifyEmailPage() {
         })
       }, 1000)
     } finally {
-      setIsSubmitting(false)
+      if (mountedRef.current && attempt === attemptRef.current) setIsSubmitting(false)
     }
   }
 

@@ -30,4 +30,22 @@ describe('VerifyEmailPage', () => {
     expect(clearIntervalSpy).toHaveBeenCalled()
     clearIntervalSpy.mockRestore()
   })
+
+  it('does not create a cooldown timer when resend resolves after unmount', async () => {
+    let resolveResend
+    const setIntervalSpy = vi.spyOn(window, 'setInterval')
+    const resendVerification = vi.fn(() => new Promise((resolve) => { resolveResend = resolve }))
+    useAuth.mockReturnValue({ authError: null, resendVerification })
+    const view = render(<MemoryRouter initialEntries={[{ pathname: '/verify-email', state: { email: 'person@example.com' } }]}><VerifyEmailPage /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: 'Complete security check' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Resend verification email' }))
+    await waitFor(() => expect(resendVerification).toHaveBeenCalled())
+    setIntervalSpy.mockClear()
+    view.unmount()
+    resolveResend({ status: true })
+    await Promise.resolve()
+
+    expect(setIntervalSpy).not.toHaveBeenCalled()
+    setIntervalSpy.mockRestore()
+  })
 })
