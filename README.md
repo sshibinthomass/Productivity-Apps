@@ -74,6 +74,28 @@ limit, publishing, analytics, and media access.
 
 ## Deployment
 
+### Cloudflare production prerequisites
+
+Before the first production deployment for each Cloudflare account/environment,
+create the D1 database. This is required once per account/environment:
+
+```bash
+npx wrangler d1 create productivity-apps
+```
+
+Copy the returned `database_id` into `wrangler.jsonc`, replacing
+`REPLACE_WITH_D1_DATABASE_ID` in the `DB` binding. Then apply the remote schema
+and deploy the Worker:
+
+```bash
+npm run db:migrate:remote
+npm run deploy:worker
+```
+
+CI assumes the D1 database already exists and has its configured `database_id`;
+it applies migrations and deploys the Worker but does not create production
+infrastructure.
+
 GitHub Pages deploys the frontend after tests, lint, and build. Its production
 build receives these GitHub Actions variables:
 

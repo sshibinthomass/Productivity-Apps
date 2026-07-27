@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -32,11 +32,12 @@ describe('Firebase removal guard', () => {
     const directory = await fixture({
       'src/client.js': "import { initializeApp } from 'firebase'",
       'worker/src/index.js': "import 'firebase/functions'",
+      'worker/src/auth.js': "const auth = require('@firebase/auth')",
       '.github/workflows/deploy.yml': 'VITE_FIREBASE_API_KEY: value',
-      'build/plugin.js': "import 'firebase-admin'",
+      'build/plugin.js': "await import('@firebase/firestore')",
       'scripts/deploy.mjs': "import 'firebase-functions'",
-      'package.json': '{"dependencies":{"firebase":"1.0.0"}}',
-      'package-lock.json': '{"packages":{"":{"dependencies":{"firebase":"1.0.0"}}}}',
+      'package.json': '{"dependencies":{"firebase":"1.0.0","@firebase/app":"1.0.0"}}',
+      'package-lock.json': '{"packages":{"node_modules/firebase":{"version":"1.0.0"},"node_modules/@firebase/app":{"version":"1.0.0"}}}',
       '.env.example': 'VITE_FIREBASE_PROJECT_ID=project',
       '.dev.vars.example': 'FIREBASE_PROJECT_ID=project',
       'vite.config.js': 'const firebaseConfig = {}',
@@ -47,6 +48,7 @@ describe('Firebase removal guard', () => {
       expect.arrayContaining([
         'src/client.js',
         'worker/src/index.js',
+        'worker/src/auth.js',
         '.github/workflows/deploy.yml',
         'build/plugin.js',
         'scripts/deploy.mjs',
@@ -58,6 +60,17 @@ describe('Firebase removal guard', () => {
         'wrangler.jsonc',
       ]),
     )
+  })
+
+  it('requires the one-time production D1 creation handoff in active setup documentation', async () => {
+    const readme = await readFile(path.resolve('README.md'), 'utf8')
+
+    expect(readme).toMatch(/npx wrangler d1 create productivity-apps/)
+    expect(readme).toMatch(/database_id/)
+    expect(readme).toMatch(/npm run db:migrate:remote/)
+    expect(readme).toMatch(/npm run deploy:worker/)
+    expect(readme).toMatch(/once per account\/environment/i)
+    expect(readme).toMatch(/CI assumes.*exists/i)
   })
 
   it('excludes historical, generated, dependency, and guard-test files', async () => {

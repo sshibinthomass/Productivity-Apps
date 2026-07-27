@@ -17,8 +17,9 @@ const ignoredFiles = new Set([
   'scripts/check-no-firebase.test.js',
 ])
 const patterns = [
-  /(?:from\s+|import\s+|import\s*\(\s*|require\s*\()\s*['"]firebase(?:\/[^'"]*)?['"]/i,
-  /['"]firebase(?:\/[^'"]*)?['"]\s*:/i,
+  /(?:from\s+|import\s+|import\s*\(\s*|require\s*\()\s*['"](?:@firebase|firebase)(?:\/[^'"]*)?['"]/i,
+  /['"](?:@firebase|firebase)(?:\/[^'"]*)?['"]\s*:/i,
+  /['"]node_modules\/(?:@firebase(?:\/[^'"]*)?|firebase)['"]/i,
   /\bfirebase-(?:functions|admin)\b/i,
   /\b(?:VITE_)?FIREBASE_[A-Z0-9_]*\b/i,
   /\b(?:firebaseConfig|firebaseapp\.com|firebasestorage\.app)\b/i,
