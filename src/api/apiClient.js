@@ -43,8 +43,13 @@ export function createApiClient({ baseUrl, fetchImpl = globalThis.fetch, timeout
         headers: requestHeaders,
         body: requestBody,
       })
-      const payload = await responseJson(response)
       if (!response.ok) {
+        let payload = null
+        try {
+          payload = await response.json()
+        } catch {
+          // Error bodies are not trusted API data and may be plain text.
+        }
         const detail = payload?.error
         throw apiError({
           code: detail?.code ?? 'request_failed',
@@ -52,7 +57,7 @@ export function createApiClient({ baseUrl, fetchImpl = globalThis.fetch, timeout
           status: response.status,
         })
       }
-      return payload
+      return responseJson(response)
     } catch (error) {
       if (controller.signal.aborted || error?.name === 'AbortError') {
         throw apiError({ code: 'timeout', message: 'The request timed out. Please try again.', status: 408, cause: error })

@@ -40,6 +40,17 @@ describe('API client', () => {
     })
   })
 
+  it('preserves the status for a plain-text error response without exposing its body', async () => {
+    const client = createApiClient({
+      baseUrl: 'https://api.shibinthomas.com',
+      fetchImpl: vi.fn().mockResolvedValue(new Response('Not found.', { status: 404 })),
+    })
+
+    await expect(client.get('/v1/public/sites/missing')).rejects.toMatchObject({
+      code: 'request_failed', status: 404, message: 'The request could not be completed.',
+    })
+  })
+
   it('normalizes a network failure', async () => {
     const client = createApiClient({
       baseUrl: 'https://api.shibinthomas.com',

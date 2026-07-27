@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { createApiClient } from '../../../api/apiClient.js'
 import { createDraft } from '../model/miniSiteModel.js'
 import { createMiniSiteRepository } from './miniSiteRepository.js'
 
@@ -73,6 +74,16 @@ describe('mini-site repository HTTP contracts', () => {
     const publicApi = createApi()
     publicApi.get.mockRejectedValue(Object.assign(new Error('Not found.'), { code: 'not_found', status: 404 }))
     const repository = createMiniSiteRepository(management, { publicApi })
+
+    await expect(repository.getPublished('unpublished')).resolves.toBeNull()
+  })
+
+  it('keeps a plain-text Worker 404 as a not-found public result', async () => {
+    const publicApi = createApiClient({
+      baseUrl: 'https://links.shibinthomas.com',
+      fetchImpl: vi.fn().mockResolvedValue(new Response('Not found.', { status: 404 })),
+    })
+    const repository = createMiniSiteRepository(createApi(), { publicApi })
 
     await expect(repository.getPublished('unpublished')).resolves.toBeNull()
   })
