@@ -1,199 +1,112 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  limit,
-  orderBy,
-  query,
-} from 'firebase/firestore'
-import { httpsCallable } from 'firebase/functions'
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
-import { firebaseClient } from '../../../auth/firebaseClient.js'
+import { createApiClient } from '../../../api/apiClient.js'
 import { normalizeDraft } from '../model/miniSiteModel.js'
 
-const firebaseSdk = {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  limit,
-  orderBy,
-  query,
-  httpsCallable,
-  ref,
-  uploadBytes,
-  getDownloadURL,
+function segment(value) {
+  return encodeURIComponent(String(value))
 }
 
-function requireService(value, name) {
-  if (!value) {
-    const error = new Error(`Firebase ${name} is not configured.`)
-    error.code = 'configuration-error'
-    throw error
-  }
-  return value
+function siteDraft(value) {
+  const normalized = normalizeDraft(value)
+  const siteId = value?.siteId ?? value?.id
+  return { ...normalized, id: siteId, siteId }
 }
 
-function documentData(snapshot, fallback = null) {
-  return snapshot.exists() ? snapshot.data() : fallback
+function publishedSite(value) {
+  return value ? normalizeDraft(value) : null
 }
 
-function callable(client, sdk, name) {
-  return async (payload) => {
-    const operation = sdk.httpsCallable(
-      requireService(client.functions, 'Functions'),
-      name,
-    )
-    return (await operation(payload)).data
-  }
+function apiSite(response) {
+  return siteDraft(response?.site ?? response)
 }
 
-export function createMiniSiteRepository(client, sdk = firebaseSdk) {
-  const getDatabase = () => requireService(client.db, 'Firestore')
-  const lifecycle = Object.fromEntries(
-    [
-      'createMiniSite',
-      'duplicateMiniSite',
-      'saveMiniSiteDraft',
-      'changeMiniSiteSlug',
-      'publishMiniSite',
-      'unpublishMiniSite',
-      'deleteMiniSite',
-      'recordMiniSiteEvent',
-    ].map((name) => [name, callable(client, sdk, name)]),
-  )
+export function createMiniSiteRepository(apiClient, { publicApi = apiClient } = {}) {
+  if (!apiClient) throw new TypeError('An API client is required.')
 
   return {
     async listSites(uid) {
-      const db = getDatabase()
-      const sitesQuery = sdk.query(
-        sdk.collection(db, 'users', uid, 'sites'),
-        sdk.orderBy('updatedAt', 'desc'),
-      )
-      const snapshot = await sdk.getDocs(sitesQuery)
-      return Promise.all(
-        snapshot.docs.map(async (item) => {
-          const summarySnapshot = await sdk.getDoc(
-            sdk.doc(
-              db,
-              'users',
-              uid,
-              'sites',
-              item.id,
-              'analytics',
-              'summary',
-            ),
-          )
-          const analytics = documentData(summarySnapshot, {
-            totalViews: 0,
-            totalClicks: 0,
-          })
-          return {
-            id: item.id,
-            ...normalizeDraft(item.data()),
-            analytics: {
-              totalViews: analytics.totalViews ?? 0,
-              totalClicks: analytics.totalClicks ?? 0,
-            },
-          }
-        }),
-      )
+      void uid
+      const response = await apiClient.get('/v1/sites')
+      return (response?.sites ?? []).map((site) => ({
+        ...siteDraft(site),
+        analytics: site.analytics ?? { totalViews: 0, totalClicks: 0 },
+      }))
     },
 
-    async getDraft(uid, siteId) {
-      const db = getDatabase()
-      const snapshot = await sdk.getDoc(
-        sdk.doc(db, 'users', uid, 'sites', siteId),
-      )
-      if (!snapshot.exists()) {
-        const error = new Error('This mini-site could not be found.')
-        error.code = 'not-found'
-        throw error
-      }
-      return { id: siteId, ...normalizeDraft(snapshot.data()) }
+    async getDraft(_uid, siteId) {
+      return apiSite(await apiClient.get(`/v1/sites/${segment(siteId)}`))
     },
 
     async saveDraft(_uid, siteId, draft, expectedRevision) {
-      const normalized = normalizeDraft(draft)
-      const result = await lifecycle.saveMiniSiteDraft({
-        siteId,
+      const response = await apiClient.put(`/v1/sites/${segment(siteId)}`, {
         expectedRevision,
-        draft: normalized,
+        draft: normalizeDraft(draft),
       })
-      return { ...normalizeDraft(result), id: siteId }
+      return apiSite(response)
     },
 
     async getPublished(slug) {
-      const db = getDatabase()
-      const snapshot = await sdk.getDoc(
-        sdk.doc(db, 'publishedMiniSites', slug),
-      )
-      return documentData(snapshot)
-    },
-
-    createSite: lifecycle.createMiniSite,
-    duplicateSite: lifecycle.duplicateMiniSite,
-    changeSlug: lifecycle.changeMiniSiteSlug,
-    publishSite: (siteId) => lifecycle.publishMiniSite({ siteId }),
-    unpublishSite: (siteId) => lifecycle.unpublishMiniSite({ siteId }),
-    deleteSite: lifecycle.deleteMiniSite,
-    recordEvent: lifecycle.recordMiniSiteEvent,
-
-    async uploadDraftAsset({ uid, siteId, assetId, file }) {
-      const storage = requireService(client.storage, 'Storage')
-      const storagePath = `mini-site-drafts/${uid}/${siteId}/${assetId}`
-      const assetRef = sdk.ref(storage, storagePath)
-      const uploaded = await sdk.uploadBytes(assetRef, file, {
-        contentType: file.type,
-      })
-      return {
-        storagePath,
-        url: await sdk.getDownloadURL(uploaded.ref),
+      try {
+        const response = await publicApi.get(`/v1/public/sites/${segment(slug)}`)
+        return publishedSite(response?.site ?? response)
+      } catch (error) {
+        if (error?.code === 'not_found' || error?.status === 404) return null
+        throw error
       }
     },
 
-    async getAnalytics(uid, siteId) {
-      const db = getDatabase()
-      const summarySnapshot = await sdk.getDoc(
-        sdk.doc(
-          db,
-          'users',
-          uid,
-          'sites',
-          siteId,
-          'analytics',
-          'summary',
-        ),
-      )
-      const daysSnapshot = await sdk.getDocs(
-        sdk.query(
-          sdk.collection(
-            db,
-            'users',
-            uid,
-            'sites',
-            siteId,
-            'analyticsDays',
-          ),
-          sdk.orderBy('date', 'desc'),
-          sdk.limit(30),
-        ),
-      )
-      const summary = documentData(summarySnapshot, {
-        totalViews: 0,
-        totalClicks: 0,
-        linkClicks: {},
-      })
-      return {
-        summary,
-        days: daysSnapshot.docs
-          .map((item) => ({ date: item.id, ...item.data() }))
-          .reverse(),
-        linkClicks: summary.linkClicks ?? {},
+    async createSite(input) {
+      return apiSite(await apiClient.post('/v1/sites', input))
+    },
+
+    async duplicateSite({ sourceSiteId, ...input }) {
+      return apiSite(await apiClient.post(`/v1/sites/${segment(sourceSiteId)}/duplicate`, input))
+    },
+
+    async changeSlug({ siteId, slug }) {
+      return apiSite(await apiClient.put(`/v1/sites/${segment(siteId)}/slug`, { slug }))
+    },
+
+    async publishSite(siteId) {
+      const response = await apiClient.post(`/v1/sites/${segment(siteId)}/publish`, {})
+      return response?.publication ?? response
+    },
+
+    async unpublishSite(siteId) {
+      const response = await apiClient.post(`/v1/sites/${segment(siteId)}/unpublish`, {})
+      return response?.publication ?? response
+    },
+
+    deleteSite({ siteId, confirmationName }) {
+      return apiClient.delete(`/v1/sites/${segment(siteId)}`, { confirmationName })
+    },
+
+    async recordEvent({ slug, ...event }) {
+      try {
+        return await publicApi.post(`/v1/public/sites/${segment(slug)}/events`, event)
+      } catch {
+        return null
       }
+    },
+
+    async uploadDraftAsset({ siteId, file }) {
+      const form = new FormData()
+      form.set('file', file)
+      const response = await apiClient.upload(`/v1/sites/${segment(siteId)}/assets`, form)
+      return response?.asset ?? response
+    },
+
+    async getAnalytics(_uid, siteId) {
+      const response = await apiClient.get(`/v1/sites/${segment(siteId)}/analytics`)
+      return response?.analytics ?? response
     },
   }
 }
 
-export const miniSiteRepository = createMiniSiteRepository(firebaseClient)
+const managementApi = createApiClient({
+  baseUrl: import.meta.env.VITE_API_BASE_URL ?? 'https://api.shibinthomas.com',
+})
+const publicApi = createApiClient({
+  baseUrl: import.meta.env.VITE_PUBLIC_SITE_BASE_URL ?? 'https://links.shibinthomas.com',
+})
+
+export const miniSiteRepository = createMiniSiteRepository(managementApi, { publicApi })

@@ -1,200 +1,79 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createDraft } from '../model/miniSiteModel.js'
 import { createMiniSiteRepository } from './miniSiteRepository.js'
 
-function createFakeSdk() {
-  const calls = []
-  const documents = new Map([
-    [
-      'users/user-1/sites/site-1',
-      {
-        ...createDraft({
-          name: 'Maya Studio',
-          slug: 'maya-studio',
-          templateId: 'creator',
-        }),
-        draftRevision: 2,
-      },
-    ],
-    [
-      'publishedMiniSites/maya-studio',
-      {
-        slug: 'maya-studio',
-        blocks: [],
-        theme: {},
-        seo: {},
-      },
-    ],
-  ])
-
+function createApi() {
   return {
-    calls,
-    documents,
-    doc: (_db, ...segments) => segments.join('/'),
-    collection: (_db, ...segments) => segments.join('/'),
-    orderBy: (field, direction) => ({ field, direction }),
-    limit: (count) => ({ count }),
-    query: (path, ...constraints) => ({ path, constraints }),
-    getDoc: async (path) => ({
-      id: path.split('/').at(-1),
-      exists: () => documents.has(path),
-      data: () => documents.get(path),
-    }),
-    getDocs: async (queryValue) => {
-      calls.push(['getDocs', queryValue])
-      if (queryValue.path.endsWith('analyticsDays')) {
-        return {
-          docs: [
-            {
-              id: '2026-07-26',
-              data: () => ({ views: 4, clicks: 2 }),
-            },
-          ],
-        }
-      }
-      return {
-        docs: [
-          {
-            id: 'site-1',
-            data: () => documents.get('users/user-1/sites/site-1'),
-          },
-        ],
-      }
-    },
-    runTransaction: async (_db, operation) =>
-      operation({
-        get: async (path) => ({
-          exists: () => documents.has(path),
-          data: () => documents.get(path),
-        }),
-        update: (path, patch) => {
-          calls.push(['update', path, patch])
-          documents.set(path, { ...documents.get(path), ...patch })
-        },
-      }),
-    httpsCallable: (_functions, name) => async (payload) => {
-      calls.push(['callable', name, payload])
-      if (name === 'saveMiniSiteDraft') {
-        const path = `users/user-1/sites/${payload.siteId}`
-        const current = documents.get(path)
-        if (current.draftRevision !== payload.expectedRevision) {
-          const error = new Error('Revision conflict')
-          error.code = 'revision-conflict'
-          throw error
-        }
-        const saved = {
-          ...current,
-          ...payload.draft,
-          draftRevision: current.draftRevision + 1,
-        }
-        documents.set(path, saved)
-        return { data: saved }
-      }
-      return { data: { siteId: 'site-new', slug: payload.slug } }
-    },
-    ref: (_storage, path) => path,
-    uploadBytes: async (path, file, metadata) => {
-      calls.push(['upload', path, file, metadata])
-      return { ref: path }
-    },
-    getDownloadURL: async (path) => `https://storage.example/${path}`,
+    get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), upload: vi.fn(),
   }
 }
 
-describe('mini-site repository', () => {
-  it('loads owner drafts and exact public snapshots', async () => {
-    const sdk = createFakeSdk()
-    sdk.documents.set(
-      'users/user-1/sites/site-1/analytics/summary',
-      { totalViews: 12, totalClicks: 5 },
-    )
-    const repository = createMiniSiteRepository(
-      { db: {}, storage: {}, functions: {} },
-      sdk,
-    )
+describe('mini-site repository HTTP contracts', () => {
+  it('uses management endpoints, normalizes drafts, and ignores legacy uid arguments', async () => {
+    const api = createApi()
+    const source = { siteId: 'site-1', ...createDraft({ name: 'Maya Studio', slug: 'maya-studio', templateId: 'creator' }) }
+    api.get.mockResolvedValueOnce({ sites: [source] }).mockResolvedValueOnce({ site: source })
+    api.put.mockResolvedValue({ site: { ...source, name: ' Updated ', draftRevision: 3 } })
+    const repository = createMiniSiteRepository(api)
 
-    await expect(repository.listSites('user-1')).resolves.toMatchObject([
-      {
-        id: 'site-1',
-        name: 'Maya Studio',
-        analytics: { totalViews: 12, totalClicks: 5 },
-      },
-    ])
-    await expect(repository.getDraft('user-1', 'site-1')).resolves.toMatchObject(
-      { name: 'Maya Studio', draftRevision: 2 },
-    )
-    await expect(repository.getPublished('maya-studio')).resolves.toMatchObject(
-      { slug: 'maya-studio' },
-    )
+    await expect(repository.listSites('ignored-user-id')).resolves.toMatchObject([{ id: 'site-1', name: 'Maya Studio' }])
+    await expect(repository.getDraft('ignored-user-id', 'site-1')).resolves.toMatchObject({ id: 'site-1', name: 'Maya Studio' })
+    await expect(repository.saveDraft('ignored-user-id', 'site-1', { ...source, name: ' Updated ' }, 2)).resolves.toMatchObject({ id: 'site-1', name: 'Updated', draftRevision: 3 })
+    expect(api.get).toHaveBeenNthCalledWith(1, '/v1/sites')
+    expect(api.get).toHaveBeenNthCalledWith(2, '/v1/sites/site-1')
+    expect(api.put).toHaveBeenCalledWith('/v1/sites/site-1', expect.objectContaining({ expectedRevision: 2, draft: expect.objectContaining({ name: 'Updated' }) }))
   })
 
-  it('saves only when the expected revision matches', async () => {
-    const sdk = createFakeSdk()
-    const repository = createMiniSiteRepository(
-      { db: {}, storage: {}, functions: {} },
-      sdk,
-    )
-    const draft = await repository.getDraft('user-1', 'site-1')
-    draft.name = 'Updated'
+  it('uses exact lifecycle, analytics, and asset endpoint contracts', async () => {
+    const api = createApi()
+    api.post.mockResolvedValue({ site: { siteId: 'new-site' } })
+    api.put.mockResolvedValue({ site: { slug: 'maya-renamed' } })
+    api.delete.mockResolvedValue({ deleted: true })
+    api.upload.mockResolvedValue({ asset: { assetId: 'asset-1', storagePath: 'drafts/site-1/asset-1', url: 'https://api.example/asset' } })
+    api.get.mockResolvedValue({ analytics: { summary: { totalViews: 1 }, days: [], linkClicks: {} } })
+    const repository = createMiniSiteRepository(api)
 
-    await expect(
-      repository.saveDraft('user-1', 'site-1', draft, 2),
-    ).resolves.toMatchObject({ draftRevision: 3 })
-    await expect(
-      repository.saveDraft('user-1', 'site-1', draft, 2),
-    ).rejects.toMatchObject({ code: 'revision-conflict' })
+    await expect(repository.createSite({ name: 'New', slug: 'new-site', templateId: 'blank' })).resolves.toMatchObject({
+      id: 'new-site',
+      siteId: 'new-site',
+    })
+    await repository.duplicateSite({ sourceSiteId: 'site-1', name: 'Copy', slug: 'copy', templateId: 'blank' })
+    await repository.changeSlug({ siteId: 'site-1', slug: 'maya-renamed' })
+    await repository.publishSite('site-1')
+    await repository.unpublishSite('site-1')
+    await repository.deleteSite({ siteId: 'site-1', confirmationName: 'Maya' })
+    await repository.uploadDraftAsset({ uid: 'ignored-user-id', siteId: 'site-1', assetId: 'ignored-asset-id', file: new File(['image'], 'image.png', { type: 'image/png' }) })
+    await repository.getAnalytics('ignored-user-id', 'site-1')
+
+    expect(api.post).toHaveBeenNthCalledWith(1, '/v1/sites', { name: 'New', slug: 'new-site', templateId: 'blank' })
+    expect(api.post).toHaveBeenNthCalledWith(2, '/v1/sites/site-1/duplicate', { name: 'Copy', slug: 'copy', templateId: 'blank' })
+    expect(api.put).toHaveBeenCalledWith('/v1/sites/site-1/slug', { slug: 'maya-renamed' })
+    expect(api.post).toHaveBeenCalledWith('/v1/sites/site-1/publish', {})
+    expect(api.post).toHaveBeenCalledWith('/v1/sites/site-1/unpublish', {})
+    expect(api.delete).toHaveBeenCalledWith('/v1/sites/site-1', { confirmationName: 'Maya' })
+    expect(api.upload).toHaveBeenCalledWith('/v1/sites/site-1/assets', expect.any(FormData))
+    expect(api.get).toHaveBeenCalledWith('/v1/sites/site-1/analytics')
   })
 
-  it('uses callable lifecycle contracts and owner upload paths', async () => {
-    const sdk = createFakeSdk()
-    const repository = createMiniSiteRepository(
-      { db: {}, storage: {}, functions: {} },
-      sdk,
-    )
+  it('uses the public client for snapshots and fire-and-forget analytics', async () => {
+    const management = createApi()
+    const publicApi = createApi()
+    publicApi.get.mockResolvedValue({ site: { slug: 'maya', blocks: [], theme: {}, seo: {} } })
+    publicApi.post.mockRejectedValue(new Error('offline'))
+    const repository = createMiniSiteRepository(management, { publicApi })
 
-    await repository.createSite({
-      name: 'New site',
-      slug: 'new-site',
-      templateId: 'blank',
-    })
-    const upload = await repository.uploadDraftAsset({
-      uid: 'user-1',
-      siteId: 'site-1',
-      assetId: 'asset-1',
-      file: { type: 'image/png', size: 1200 },
-    })
-
-    expect(sdk.calls).toContainEqual([
-      'callable',
-      'createMiniSite',
-      { name: 'New site', slug: 'new-site', templateId: 'blank' },
-    ])
-    expect(upload).toEqual({
-      storagePath: 'mini-site-drafts/user-1/site-1/asset-1',
-      url: 'https://storage.example/mini-site-drafts/user-1/site-1/asset-1',
-    })
+    await expect(repository.getPublished('maya')).resolves.toMatchObject({ slug: 'maya' })
+    await expect(repository.recordEvent({ slug: 'maya', type: 'view', eventId: 'event-1' })).resolves.toBeNull()
+    expect(publicApi.get).toHaveBeenCalledWith('/v1/public/sites/maya')
+    expect(publicApi.post).toHaveBeenCalledWith('/v1/public/sites/maya/events', { type: 'view', eventId: 'event-1' })
   })
 
-  it('returns daily and summary analytics through owner paths', async () => {
-    const sdk = createFakeSdk()
-    sdk.documents.set('users/user-1/sites/site-1/analytics/summary', {
-      totalViews: 12,
-      totalClicks: 5,
-      linkClicks: { link1: 5 },
-    })
-    const repository = createMiniSiteRepository(
-      { db: {}, storage: {}, functions: {} },
-      sdk,
-    )
+  it('keeps an unpublished public site as a not-found result for the page', async () => {
+    const management = createApi()
+    const publicApi = createApi()
+    publicApi.get.mockRejectedValue(Object.assign(new Error('Not found.'), { code: 'not_found', status: 404 }))
+    const repository = createMiniSiteRepository(management, { publicApi })
 
-    await expect(repository.getAnalytics('user-1', 'site-1')).resolves.toEqual({
-      summary: {
-        totalViews: 12,
-        totalClicks: 5,
-        linkClicks: { link1: 5 },
-      },
-      days: [{ date: '2026-07-26', views: 4, clicks: 2 }],
-      linkClicks: { link1: 5 },
-    })
+    await expect(repository.getPublished('unpublished')).resolves.toBeNull()
   })
 })
