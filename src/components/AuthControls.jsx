@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router'
 import { useAuth } from '../auth/authContext.js'
 
 export default function AuthControls() {
@@ -26,7 +26,7 @@ export default function AuthControls() {
     return (
       <div className="auth-controls">
         <Link className="auth-link" to="/login">
-          Sign in with Google
+          Sign in
         </Link>
         {visibleError && (
           <span className="auth-controls__error" role="alert">
@@ -37,7 +37,7 @@ export default function AuthControls() {
     )
   }
 
-  const identity = user.displayName || user.email || 'Google account'
+  const identity = user.displayName || user.email || 'Account'
 
   async function handleSignOut() {
     setIsSigningOut(true)
@@ -47,7 +47,7 @@ export default function AuthControls() {
       const didSignOut = await signOutUser()
 
       if (!didSignOut) {
-        setSignOutError('Google could not sign you out. Please try again.')
+        setSignOutError('We could not sign you out. Please try again.')
       }
     } finally {
       setIsSigningOut(false)
@@ -56,7 +56,7 @@ export default function AuthControls() {
 
   return (
     <div className="auth-controls">
-      <span className="auth-controls__identity">
+      <Link className="auth-controls__identity" to="/account/security" aria-label="Manage account security">
         {user.photoURL && (
           <img
             className="auth-controls__avatar"
@@ -66,7 +66,7 @@ export default function AuthControls() {
           />
         )}
         <span className="auth-controls__name">{identity}</span>
-      </span>
+      </Link>
       <button
         className="auth-sign-out"
         type="button"

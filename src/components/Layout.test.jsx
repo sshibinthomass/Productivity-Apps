@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { AuthContext } from '../auth/authContext.js'
 import { ThemeContext } from '../theme/themeContext.js'
@@ -9,7 +9,13 @@ const signedOutAuth = {
   user: null,
   isAuthLoading: false,
   authError: null,
-  signInWithGoogle: vi.fn(),
+  signInWithEmail: vi.fn(),
+  registerWithEmail: vi.fn(),
+  resendVerification: vi.fn(),
+  requestPasswordReset: vi.fn(),
+  resetPassword: vi.fn(),
+  changePassword: vi.fn(),
+  refreshSession: vi.fn(),
   signOutUser: vi.fn(),
 }
 

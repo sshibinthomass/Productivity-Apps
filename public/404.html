@@ -10,19 +10,9 @@
     <p>Opening Productivity Apps…</p>
     <script>
       ;(() => {
-        const base = '/Productivity-Apps'
         const { pathname, search, hash } = window.location
-
-        if (pathname !== base && !pathname.startsWith(`${base}/`)) {
-          window.location.replace(`${base}/`)
-          return
-        }
-
-        const requestedRoute = pathname.slice(base.length) || '/'
-        const route = `${requestedRoute}${search}${hash}`
-        window.location.replace(
-          `${base}/?route=${encodeURIComponent(route)}`,
-        )
+        const route = `${pathname || '/'}${search}${hash}`
+        window.location.replace(`/?route=${encodeURIComponent(route)}`)
       })()
     </script>
   </body>

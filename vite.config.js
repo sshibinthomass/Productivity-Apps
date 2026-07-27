@@ -3,12 +3,7 @@ import react from '@vitejs/plugin-react'
 import { sites } from './build/sites-vite-plugin.js'
 
 export default defineConfig({
-  base:
-    process.env.SITES_BUILD === 'true'
-      ? '/'
-      : process.env.NODE_ENV === 'production'
-        ? '/Productivity-Apps/'
-        : '/',
+  base: '/',
   build:
     process.env.SITES_BUILD === 'true'
       ? {

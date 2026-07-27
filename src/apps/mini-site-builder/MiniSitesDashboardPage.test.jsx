@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAuth } from '../../auth/authContext.js'
 import { MiniSiteRepositoryProvider } from './data/repositoryContext.jsx'
@@ -53,7 +53,7 @@ describe('MiniSitesDashboardPage', () => {
       screen
         .getByRole('link', { name: 'Open Maya Studio public site' })
         .getAttribute('href'),
-    ).toBe('/s/maya-studio')
+    ).toBe('https://links.shibinthomas.com/maya-studio')
   })
 
   it('disables new and duplicate actions at the five-site limit', async () => {

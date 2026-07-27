@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useAuth } from '../auth/authContext.js'
 import AuthControls from './AuthControls.jsx'
@@ -28,7 +28,7 @@ describe('AuthControls', () => {
 
     expect(screen.getByRole('status').textContent).toContain('Checking session')
     expect(
-      screen.queryByRole('link', { name: 'Sign in with Google' }),
+      screen.queryByRole('link', { name: 'Sign in' }),
     ).toBeNull()
   })
 
@@ -47,7 +47,7 @@ describe('AuthControls', () => {
     )
 
     expect(
-      screen.getByRole('link', { name: 'Sign in with Google' }).getAttribute(
+      screen.getByRole('link', { name: 'Sign in' }).getAttribute(
         'href',
       ),
     ).toBe('/login')
@@ -57,7 +57,7 @@ describe('AuthControls', () => {
     useAuth.mockReturnValue({
       user: null,
       isAuthLoading: false,
-      authError: 'Firebase sign-in is not configured.',
+      authError: 'Email and password sign-in is not configured.',
       signOutUser: vi.fn(),
     })
 
@@ -74,7 +74,7 @@ describe('AuthControls', () => {
     useAuth.mockReturnValue({
       user: null,
       isAuthLoading: false,
-      authError: 'Firebase sign-in is not configured.',
+      authError: 'Email and password sign-in is not configured.',
       signOutUser: vi.fn(),
     })
 
@@ -108,6 +108,7 @@ describe('AuthControls', () => {
     )
 
     expect(screen.getByText('Ada Lovelace')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Manage account security' }).getAttribute('href')).toBe('/account/security')
     expect(
       screen.getByRole('img', { name: 'Ada Lovelace profile' }),
     ).toBeTruthy()
@@ -143,13 +144,13 @@ describe('AuthControls', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('alert').textContent).toContain(
-        'could not sign you out',
+        'We could not sign you out. Please try again.',
       )
       expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy()
     })
   })
 
-  it('uses the email when Google has no display name or profile image', () => {
+  it('uses the email when the account has no display name or profile image', () => {
     useAuth.mockReturnValue({
       user: {
         uid: 'user-1',

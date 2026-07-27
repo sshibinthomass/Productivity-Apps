@@ -5,7 +5,7 @@ import {
   useReducer,
   useState,
 } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams } from 'react-router'
 import { useAuth } from '../../../auth/authContext.js'
 import { useMiniSiteRepository } from '../data/repositoryContext.js'
 import {

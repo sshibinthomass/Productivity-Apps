@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useParams } from 'react-router'
 import { useMiniSiteRepository } from './data/repositoryContext.js'
+import { readMiniSiteBootstrap } from './publicBootstrap.js'
 import { MiniSiteRenderer } from './renderer/MiniSiteRenderer.jsx'
 
-function sessionEventId(slug) {
+function sessionViewEventId(slug) {
   const key = `mini-site-view:${slug}`
   const existing = globalThis.sessionStorage?.getItem(key)
   if (existing) return existing
@@ -14,17 +15,35 @@ function sessionEventId(slug) {
   return eventId
 }
 
+function clickEventId() {
+  const entropy = globalThis.crypto?.randomUUID?.() ??
+    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+  return `click-${entropy}`
+}
+
+function claimViewEvent(slug) {
+  const reportedKey = `mini-site-view-reported:${slug}`
+  if (globalThis.sessionStorage?.getItem(reportedKey)) return null
+  const eventId = sessionViewEventId(slug)
+  globalThis.sessionStorage?.setItem(reportedKey, 'true')
+  return eventId
+}
+
 export default function PublicMiniSitePage() {
   const { slug } = useParams()
   const repository = useMiniSiteRepository()
+  const bootstrap = useMemo(() => readMiniSiteBootstrap(globalThis.document), [])
+  const bootstrapSite = bootstrap?.slug === slug ? bootstrap : null
   const [state, setState] = useState({
     slug,
-    status: 'loading',
-    site: null,
+    status: bootstrapSite ? 'ready' : 'loading',
+    site: bootstrapSite,
   })
   const viewReported = useRef(false)
 
   useEffect(() => {
+    if (bootstrapSite) return undefined
+
     let active = true
     repository
       .getPublished(slug)
@@ -38,10 +57,13 @@ export default function PublicMiniSitePage() {
     return () => {
       active = false
     }
-  }, [repository, slug])
+  }, [bootstrapSite, repository, slug])
 
-  const currentState =
-    state.slug === slug ? state : { slug, status: 'loading', site: null }
+  const currentState = bootstrapSite
+    ? { slug, status: 'ready', site: bootstrapSite }
+    : state.slug === slug
+      ? state
+      : { slug, status: 'loading', site: null }
 
   useEffect(() => {
     viewReported.current = false
@@ -50,11 +72,13 @@ export default function PublicMiniSitePage() {
   useEffect(() => {
     if (currentState.status !== 'ready' || viewReported.current) return
     viewReported.current = true
+    const eventId = claimViewEvent(slug)
+    if (!eventId) return
     repository
       .recordEvent({
         slug,
         type: 'view',
-        eventId: sessionEventId(slug),
+        eventId,
       })
       .catch(() => {})
   }, [currentState.status, repository, slug])
@@ -102,7 +126,7 @@ export default function PublicMiniSitePage() {
             slug,
             type: 'link_click',
             blockId,
-            eventId: `${sessionEventId(slug)}:${blockId}:${Date.now()}`,
+            eventId: clickEventId(),
           })
           .catch(() => {})
       }}

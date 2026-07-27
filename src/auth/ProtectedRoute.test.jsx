@@ -4,7 +4,7 @@ import {
   Route,
   Routes,
   useLocation,
-} from 'react-router-dom'
+} from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useAuth } from './authContext.js'
 import ProtectedRoute from './ProtectedRoute.jsx'
@@ -78,7 +78,7 @@ describe('ProtectedRoute', () => {
 
   it('renders protected content for a signed-in user', () => {
     useAuth.mockReturnValue({
-      user: { uid: 'user-1' },
+      user: { uid: 'user-1', email: 'ada@example.com', emailVerified: true },
       isAuthLoading: false,
     })
 

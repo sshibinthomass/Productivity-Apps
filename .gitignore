@@ -1,8 +1,9 @@
 .worktrees/
+.wrangler/
 node_modules/
 dist/
 .playwright-cli/
 output/
 *.local
+.dev.vars
 *-debug.log
-.firebase/
