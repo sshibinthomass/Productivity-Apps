@@ -12,6 +12,10 @@ function request(host, path, options = {}) {
   return new Request(`http://${host}${path}`, { ...options, headers })
 }
 
+function cookieFrom(response) {
+  return response.headers.get('Set-Cookie').match(/^[^;]+/)[0]
+}
+
 async function seedPublishedSite() {
   const snapshot = {
     schemaVersion: 1,
@@ -60,6 +64,63 @@ describe('explicit local Worker routing', () => {
     await expect(session.json()).resolves.toEqual({ user: null })
     expect(site.status).toBe(201)
     await expect(site.json()).resolves.toMatchObject({ site: { slug: 'local-site' } })
+  })
+
+  it('completes local email verification and host-only session authentication without a requireUser stub', async () => {
+    const deliveries = []
+    const authWorker = createWorker({
+      verifyTurnstile: async () => undefined,
+      email: {
+        sendVerification: async (message) => deliveries.push(message),
+        sendPasswordReset: async () => undefined,
+      },
+    })
+    const signUp = await authWorker.fetch(request('localhost:8787', '/auth/sign-up/email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Turnstile-Token': 'test-token',
+        'X-Consent-Version': '2026-07-26',
+      },
+      body: JSON.stringify({ name: 'Verified Local', email: 'verified-local@example.com', password: 'long-enough-password' }),
+    }), localRuntime, createExecutionContext())
+
+    expect(signUp.status).toBe(200)
+    expect(deliveries).toHaveLength(1)
+    expect(new URL(deliveries[0].url).origin).toBe('http://localhost:8787')
+    expect(new URL(deliveries[0].url).searchParams.get('callbackURL')).toBe(`${devOrigin}/login`)
+
+    const verification = await authWorker.fetch(new Request(deliveries[0].url, {
+      headers: { Origin: devOrigin },
+    }), localRuntime, createExecutionContext())
+    const verificationCookie = cookieFrom(verification)
+    expect(verification.status).toBe(302)
+    expect(new URL(verification.headers.get('Location')).origin).toBe(devOrigin)
+    expect(verification.headers.get('Set-Cookie')).not.toContain('Domain=.shibinthomas.com')
+    expect(verification.headers.get('Set-Cookie')).not.toContain('Secure')
+
+    const signIn = await authWorker.fetch(request('localhost:8787', '/auth/sign-in/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Turnstile-Token': 'test-token' },
+      body: JSON.stringify({ email: 'verified-local@example.com', password: 'long-enough-password' }),
+    }), localRuntime, createExecutionContext())
+    const sessionCookie = cookieFrom(signIn)
+    expect(signIn.status).toBe(200)
+    expect(signIn.headers.get('Set-Cookie')).not.toContain('Domain=.shibinthomas.com')
+    expect(signIn.headers.get('Set-Cookie')).not.toContain('Secure')
+
+    const session = await authWorker.fetch(request('localhost:8787', '/v1/session', {
+      headers: { Cookie: sessionCookie },
+    }), localRuntime, createExecutionContext())
+    const site = await authWorker.fetch(request('localhost:8787', '/v1/sites', {
+      method: 'POST',
+      headers: { Cookie: sessionCookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Verified Local Site', slug: 'verified-local-site', templateId: 'blank' }),
+    }), localRuntime, createExecutionContext())
+
+    await expect(session.json()).resolves.toMatchObject({ user: { email: 'verified-local@example.com' } })
+    expect(site.status).toBe(201)
+    expect(verificationCookie).toContain('better-auth')
   })
 
   it('routes local public slugs, public JSON, and public assets to the public host behavior', async () => {

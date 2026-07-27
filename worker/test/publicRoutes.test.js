@@ -1,6 +1,7 @@
 import { createExecutionContext, env } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createWorker } from '../src/index.js'
+import { createPublicRoutes } from '../src/public/routes.js'
 import { resetDatabase } from './support/database.js'
 
 const publicOrigin = 'https://links.shibinthomas.com'
@@ -103,6 +104,31 @@ describe('public mini-site routes', () => {
     const response = await worker.fetch(new Request(`${publicOrigin}/assets/not-a-public-r2-object.js`), env, createExecutionContext())
 
     expect(response.status).not.toBe(500)
+  })
+
+  it('serves explicit shell asset paths from ASSETS without treating extensionless slugs as static', async () => {
+    const staticPaths = ['/', '/index.html', '/assets/app.js', '/fonts/display.woff2', '/brand/logo.svg', '/favicon.svg', '/404.html']
+    const staticRoutes = createPublicRoutes({
+      db: { prepare() { throw new Error('Static paths must not query published sites.') } },
+      assets: {}, analytics: {}, origin: publicOrigin,
+      staticAssets: { fetch: async (request) => new Response(`static:${new URL(request.url).pathname}`) },
+    })
+
+    for (const path of staticPaths) {
+      const response = await staticRoutes.handle(new Request(`${publicOrigin}${path}`))
+      expect(await response.text()).toBe(`static:${path}`)
+    }
+
+    const snapshot = JSON.stringify({ schemaVersion: 1, slug: 'maya-links', revision: 3, blocks: [], theme: {}, seo: { title: 'Maya', description: '' } })
+    const slugRoutes = createPublicRoutes({
+      db: { prepare() { return { bind: () => ({ first: async () => ({ slug: 'maya-links', snapshot_json: snapshot, revision: 3 }) }) } } },
+      assets: {}, analytics: {}, origin: publicOrigin,
+      staticAssets: { fetch: async () => new Response('<!doctype html><html><head></head><body></body></html>') },
+    })
+    const slug = await slugRoutes.handle(new Request(`${publicOrigin}/maya-links`))
+
+    expect(slug.status).toBe(200)
+    expect(await slug.text()).toContain('id="mini-site-bootstrap"')
   })
 
   it('adds public browser hardening headers to static root and fallback assets', async () => {

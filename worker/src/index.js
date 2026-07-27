@@ -12,6 +12,7 @@ import { createSiteRoutes, requiresJsonSiteBody, requiresMultipartAssetUpload } 
 import { createAssetService } from './assets/service.js'
 import { createAnalyticsService } from './analytics/service.js'
 import { createPublicRoutes } from './public/routes.js'
+import { isStaticShellPath } from './public/staticPaths.js'
 
 const consentVersion = '2026-07-26'
 const protectedAuthRoutes = new Map([
@@ -54,7 +55,7 @@ function isMultipartContentType(request) {
 }
 
 function localRequestBranch(pathname) {
-  if (pathname === '/' || pathname === '/index.html' || pathname.startsWith('/assets/')) return 'public'
+  if (isStaticShellPath(pathname)) return 'public'
   if (pathname.startsWith('/v1/public/') || /^\/[^/]+$/.test(pathname)) return 'public'
   return 'api'
 }
@@ -66,6 +67,15 @@ function requestBranch(hostname, pathname, runtimeEnv) {
     return localRequestBranch(pathname)
   }
   return null
+}
+
+function authEnvironment(request, hostname, env) {
+  if (!isLocalRuntimeHostname(hostname) || !isLocalDevelopmentOrigin(env.DEV_ORIGIN)) return env
+  return {
+    ...env,
+    APP_ORIGIN: env.DEV_ORIGIN,
+    API_ORIGIN: new URL(request.url).origin,
+  }
 }
 
 async function requestBody(request) {
@@ -159,9 +169,9 @@ async function sanitizeAuthResponse(response, route) {
 }
 
 function verificationRequest(request, env, body, email) {
-  const verificationBody = { email }
-  if (typeof body?.callbackURL === 'string') {
-    verificationBody.callbackURL = body.callbackURL
+  const verificationBody = {
+    email,
+    callbackURL: typeof body?.callbackURL === 'string' ? body.callbackURL : `${env.APP_ORIGIN}/login`,
   }
   return new Request(`${env.API_ORIGIN}/auth/send-verification-email`, {
     method: 'POST',
@@ -270,13 +280,14 @@ export function createWorker(dependencies = {}) {
           if (!route) {
             return withCors(request, errorResponse(new ApiError('not_found', 'Not found.', 404)), env)
           }
-          const auth = createAuth(env, { email: dependencies.email })
-          const response = await handleAuthRequest(request, env, auth, dependencies)
+          const authEnv = authEnvironment(request, hostname, env)
+          const auth = createAuth(authEnv, { email: dependencies.email })
+          const response = await handleAuthRequest(request, authEnv, auth, dependencies)
           return withCors(request, await sanitizeAuthResponse(response, route), env)
         }
 
         if (pathname === '/v1/session' && request.method === 'GET') {
-          const auth = createAuth(env, { email: dependencies.email })
+          const auth = createAuth(authEnvironment(request, hostname, env), { email: dependencies.email })
           const session = await getSession(auth, request)
           return withCors(request, Response.json({
             user: session ? {
@@ -298,7 +309,7 @@ export function createWorker(dependencies = {}) {
           if (requiresMultipartAssetUpload(request) && !isMultipartContentType(request)) {
             return withCors(request, errorResponse(new ApiError('unsupported_media_type', 'Use multipart/form-data with a file field.', 415)), env)
           }
-          const auth = createAuth(env, { email: dependencies.email })
+          const auth = createAuth(authEnvironment(request, hostname, env), { email: dependencies.email })
           const store = createD1Store({ db: env.DB })
           const assets = createAssetService({ bucket: env.MEDIA, db: env.DB, publicOrigin: env.PUBLIC_SITE_ORIGIN })
           const routes = createSiteRoutes({

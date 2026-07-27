@@ -1,7 +1,7 @@
 import { betterAuth } from 'better-auth'
 import { createEmailSender } from './email.js'
 import { ApiError } from '../http/errors.js'
-import { configuredOrigins } from '../http/cors.js'
+import { configuredOrigins, isLocalDevelopmentOrigin } from '../http/cors.js'
 
 const consentVersion = '2026-07-26'
 
@@ -17,6 +17,8 @@ async function requireRecordedConsent(db, user) {
 }
 
 export function createAuth(env, dependencies = {}) {
+  const isLocalAuth = isLocalDevelopmentOrigin(env.APP_ORIGIN)
+    && isLocalDevelopmentOrigin(env.API_ORIGIN)
   const email = dependencies.email ?? createEmailSender({
     apiKey: env.RESEND_API_KEY,
     from: env.EMAIL_FROM,
@@ -48,11 +50,13 @@ export function createAuth(env, dependencies = {}) {
         return email.sendVerification({ user, url })
       },
     },
-    advanced: {
-      crossSubDomainCookies: {
-        enabled: true,
-        domain: '.shibinthomas.com',
-      },
-    },
+    advanced: isLocalAuth
+      ? { useSecureCookies: false }
+      : {
+          crossSubDomainCookies: {
+            enabled: true,
+            domain: '.shibinthomas.com',
+          },
+        },
   })
 }

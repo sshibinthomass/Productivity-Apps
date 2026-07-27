@@ -1,5 +1,6 @@
 import { ApiError, errorResponse } from '../http/errors.js'
 import { renderPublicPage } from './renderPage.js'
+import { isStaticShellPath } from './staticPaths.js'
 
 const PUBLIC_CACHE = 'public, max-age=60, stale-while-revalidate=300'
 const ASSET_CACHE = 'public, max-age=31536000, immutable'
@@ -78,7 +79,7 @@ export function createPublicRoutes({ db, assets, staticAssets, analytics, origin
       const jsonMatch = /^\/v1\/public\/sites\/([^/]+)$/.exec(pathname); const eventMatch = /^\/v1\/public\/sites\/([^/]+)\/events$/.exec(pathname)
       if (eventMatch) { if (request.method !== 'POST') return notFound(); return Response.json(await analytics.record({ slug: decoded(eventMatch[1]), data: await parseBody(request), network: network(request) }), { headers: headers('no-store') }) }
       if (jsonMatch) { if (request.method !== 'GET') return notFound(); const site = await findSite(decoded(jsonMatch[1])); return site ? Response.json({ site }, { headers: headers(PUBLIC_CACHE) }) : notFound() }
-      if (pathname === '/' || pathname === '/index.html' || pathname.startsWith('/assets/')) return staticFallback(request)
+      if (isStaticShellPath(pathname)) return staticFallback(request)
       if (request.method !== 'GET') return notFound(); const slug = pathname.slice(1); if (!slug || slug.includes('/')) return notFound(); const site = await findSite(decoded(slug)); if (!site) return notFound(); const shell = await staticFallback(new Request(`${origin}/index.html`)); if (!shell.ok) return new Response('Public app shell is unavailable.', { status: 503, headers: headers('no-store') }); return new Response(renderPublicPage({ document: await shell.text(), site, origin }), { headers: { ...headers(PUBLIC_CACHE), 'Content-Type': 'text/html; charset=utf-8' } })
     } catch (error) { return safeError(error) }
   } }
