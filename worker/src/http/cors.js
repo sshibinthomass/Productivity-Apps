@@ -11,8 +11,20 @@ function isExactHttpOrigin(value) {
   }
 }
 
+const loopbackHostnames = new Set(['localhost', '127.0.0.1', '[::1]'])
+
+export function isLocalDevelopmentOrigin(value) {
+  if (!isExactHttpOrigin(value)) return false
+  return loopbackHostnames.has(new URL(value).hostname)
+}
+
+export function isLocalRuntimeHostname(hostname) {
+  return loopbackHostnames.has(hostname)
+}
+
 export function configuredOrigins(env) {
-  return [env?.APP_ORIGIN, env?.DEV_ORIGIN].filter(isExactHttpOrigin)
+  return [env?.APP_ORIGIN].filter(isExactHttpOrigin)
+    .concat(isLocalDevelopmentOrigin(env?.DEV_ORIGIN) ? env.DEV_ORIGIN : [])
 }
 
 export function isAllowedOrigin(origin, env) {

@@ -37,8 +37,10 @@ VITE_TURNSTILE_SITE_KEY=your-turnstile-site-key
 ```
 
 Configure Worker-only values in an untracked `.dev.vars` file (starting from
-`.dev.vars.example`). `BETTER_AUTH_SECRET`, `TURNSTILE_SECRET_KEY`, and
-`RESEND_API_KEY` must never be committed.
+`.dev.vars.example`). Set `DEV_ORIGIN=http://localhost:5173` so the Worker
+explicitly accepts the local frontend and its loopback runtime. The
+`BETTER_AUTH_SECRET`, `TURNSTILE_SECRET_KEY`, and `RESEND_API_KEY` values must
+never be committed.
 
 The migration and build steps are required before starting the Worker: D1 must
 have its schema and the Worker serves the `dist` assets configured in
@@ -49,7 +51,13 @@ Local routes include:
 
 - Frontend: `http://localhost:5173/`
 - Mini-Site dashboard: `http://localhost:5173/mini-sites`
-- Public mini-site: `http://localhost:8787/s/<slug>`
+- Public mini-site: `http://localhost:8787/<slug>`
+
+Both `VITE_API_BASE_URL` and `VITE_PUBLIC_SITE_BASE_URL` use
+`http://localhost:8787` locally. With `DEV_ORIGIN` set, the Worker sends auth,
+session, health, and `/v1/sites/*` requests to the API branch; it sends
+`/v1/public/*`, `/assets/*`, and `/<slug>` to the public branch. The Worker
+does not expose loopback hosts unless `DEV_ORIGIN` is explicitly configured.
 
 Quality checks:
 

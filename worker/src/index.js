@@ -3,7 +3,7 @@ import { enforceRateLimit } from './auth/rateLimit.js'
 import { getSession } from './auth/session.js'
 import { verifyTurnstile } from './auth/turnstile.js'
 import { validateEnv } from './env.js'
-import { isAllowedOrigin, withCors } from './http/cors.js'
+import { isAllowedOrigin, isLocalDevelopmentOrigin, isLocalRuntimeHostname, withCors } from './http/cors.js'
 import { ApiError, errorResponse } from './http/errors.js'
 import { requireUser } from './auth/session.js'
 import { createD1Store } from './sites/d1Store.js'
@@ -51,6 +51,21 @@ function isJsonContentType(request) {
 
 function isMultipartContentType(request) {
   return /^multipart\/form-data\s*;/i.test(request.headers.get('Content-Type') ?? '')
+}
+
+function localRequestBranch(pathname) {
+  if (pathname === '/' || pathname === '/index.html' || pathname.startsWith('/assets/')) return 'public'
+  if (pathname.startsWith('/v1/public/') || /^\/[^/]+$/.test(pathname)) return 'public'
+  return 'api'
+}
+
+function requestBranch(hostname, pathname, runtimeEnv) {
+  if (hostname === 'api.shibinthomas.com') return 'api'
+  if (hostname === 'links.shibinthomas.com') return 'public'
+  if (isLocalRuntimeHostname(hostname) && isLocalDevelopmentOrigin(runtimeEnv?.DEV_ORIGIN)) {
+    return localRequestBranch(pathname)
+  }
+  return null
 }
 
 async function requestBody(request) {
@@ -217,7 +232,8 @@ export function createWorker(dependencies = {}) {
   return {
     async fetch(request, runtimeEnv) {
       const { hostname, pathname } = new URL(request.url)
-      if (!['api.shibinthomas.com', 'links.shibinthomas.com'].includes(hostname)) {
+      const branch = requestBranch(hostname, pathname, runtimeEnv)
+      if (!branch) {
         return Response.json(
           { error: { code: 'not_found', message: 'Not found.' } },
           { status: 404 },
@@ -236,7 +252,7 @@ export function createWorker(dependencies = {}) {
       }
 
       try {
-        if (hostname === 'links.shibinthomas.com') {
+        if (branch === 'public') {
           const assets = createAssetService({ bucket: env.MEDIA, db: env.DB, publicOrigin: env.PUBLIC_SITE_ORIGIN })
           const analytics = createAnalyticsService({ db: env.DB, rateLimitKey: env.BETTER_AUTH_SECRET })
           const routes = createPublicRoutes({

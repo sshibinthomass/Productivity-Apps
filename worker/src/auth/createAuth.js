@@ -1,6 +1,7 @@
 import { betterAuth } from 'better-auth'
 import { createEmailSender } from './email.js'
 import { ApiError } from '../http/errors.js'
+import { configuredOrigins } from '../http/cors.js'
 
 const consentVersion = '2026-07-26'
 
@@ -29,7 +30,7 @@ export function createAuth(env, dependencies = {}) {
     basePath: '/auth',
     secret: env.BETTER_AUTH_SECRET,
     database: env.DB,
-    trustedOrigins: [env.APP_ORIGIN, env.DEV_ORIGIN].filter(Boolean),
+    trustedOrigins: configuredOrigins(env),
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 10,

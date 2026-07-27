@@ -130,8 +130,20 @@ Turnstile site key and deploys GitHub Pages.
 
 Local development needs Node.js 22.12 or newer. Copy `.dev.vars.example` to an
 untracked `.dev.vars`, supply local test values for the Worker-only bindings,
-and use `.env.local` for only the public browser values documented in the
-README. Then run:
+and keep `DEV_ORIGIN=http://localhost:5173`. This explicit loopback origin is
+required before the Worker accepts `localhost`, `127.0.0.1`, or `::1` runtime
+requests. Use `.env.local` only for these public browser values:
+
+```dotenv
+VITE_API_BASE_URL=http://localhost:8787
+VITE_PUBLIC_SITE_BASE_URL=http://localhost:8787
+VITE_TURNSTILE_SITE_KEY=your-turnstile-site-key
+```
+
+The local Worker sends auth, session, health, and `/v1/sites/*` requests to its
+API branch. It sends `/v1/public/*`, `/assets/*`, and `/<slug>` to the public
+branch; the local public mini-site URL is `http://localhost:8787/<slug>`.
+Then run:
 
 ```powershell
 npm install
@@ -155,11 +167,17 @@ shortcut yet. Apply each environment's migrations before its deployment.
 ## Backups, rollback, and incident recovery
 
 Before schema changes and on a regular retention schedule, create a protected
-off-account D1 export. This export contains personal data; encrypt it, restrict
-access, and record its location and checksum outside the application database:
+off-checkout D1 export. This export contains personal data; encrypt it, restrict
+access, set a documented retention period, and never commit it. The example
+uses an operator-owned path under the Windows user profile; replace it with an
+approved encrypted external volume when policy requires it:
 
 ```powershell
-npx wrangler d1 export productivity-apps --remote --output .\backups\productivity-apps-YYYY-MM-DD.sql
+$backupRoot = Join-Path $env:USERPROFILE 'ArveniloBackups'
+New-Item -ItemType Directory -Force -Path $backupRoot | Out-Null
+$timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$backupFile = Join-Path $backupRoot "productivity-apps-$timestamp.sql"
+npx wrangler d1 export productivity-apps --remote --output $backupFile
 ```
 
 R2 is not publicly exposed. Configure an organization-approved, encrypted R2
