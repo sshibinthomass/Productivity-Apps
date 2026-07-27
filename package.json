@@ -10,7 +10,7 @@
     "build:sites": "node scripts/build-sites.mjs",
     "preview": "vite preview",
     "test": "vitest",
-    "test:frontend": "vitest run src",
+    "test:frontend": "vitest run src scripts",
     "test:worker": "npm run build && vitest run --config worker/vitest.config.js",
     "test:run": "npm run test:frontend && npm run test:worker",
     "check:no-firebase": "node scripts/check-no-firebase.mjs",

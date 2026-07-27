@@ -32,6 +32,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify Firebase has been removed
+        run: npm run check:no-firebase
+
       - name: Run tests
         run: npm run test:run
 

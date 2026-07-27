@@ -17,6 +17,8 @@ Node.js 22.12 or newer is required.
 ```bash
 npm install
 cp .env.example .env.local
+npm run db:migrate:local
+npm run build
 npm run dev:worker
 ```
 
@@ -38,12 +40,10 @@ Configure Worker-only values in an untracked `.dev.vars` file (starting from
 `.dev.vars.example`). `BETTER_AUTH_SECRET`, `TURNSTILE_SECRET_KEY`, and
 `RESEND_API_KEY` must never be committed.
 
-Apply the local database migrations before exercising account or mini-site
-flows:
-
-```bash
-npm run db:migrate:local
-```
+The migration and build steps are required before starting the Worker: D1 must
+have its schema and the Worker serves the `dist` assets configured in
+`wrangler.jsonc`. This sequence works from a clean checkout with no `dist`
+directory.
 
 Local routes include:
 
