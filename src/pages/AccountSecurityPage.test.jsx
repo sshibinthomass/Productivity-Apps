@@ -18,4 +18,16 @@ describe('AccountSecurityPage', () => {
     await waitFor(() => expect(changePassword).toHaveBeenCalledWith({ currentPassword: 'old-password', newPassword: 'long-password' }))
     expect(screen.getByRole('status').textContent).toContain('Other signed-in sessions have been revoked')
   })
+
+  it('focuses current password before attempting an account password change', () => {
+    const changePassword = vi.fn()
+    useAuth.mockReturnValue({ user: { uid: 'user-1' }, isAuthLoading: false, authError: null, changePassword })
+    render(<MemoryRouter><Routes><Route path="/" element={<AccountSecurityPage />} /></Routes></MemoryRouter>)
+    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'long-password' } })
+    fireEvent.change(screen.getByLabelText('Confirm new password'), { target: { value: 'long-password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Change password' }))
+
+    expect(document.activeElement).toBe(screen.getByLabelText('Current password'))
+    expect(changePassword).not.toHaveBeenCalled()
+  })
 })

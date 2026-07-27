@@ -56,7 +56,7 @@ export default function AuthControls() {
 
   return (
     <div className="auth-controls">
-      <span className="auth-controls__identity">
+      <Link className="auth-controls__identity" to="/account/security" aria-label="Manage account security">
         {user.photoURL && (
           <img
             className="auth-controls__avatar"
@@ -66,7 +66,7 @@ export default function AuthControls() {
           />
         )}
         <span className="auth-controls__name">{identity}</span>
-      </span>
+      </Link>
       <button
         className="auth-sign-out"
         type="button"

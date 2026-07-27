@@ -1140,6 +1140,11 @@ p {
   outline: 0;
 }
 
+.auth-form input:not([type="checkbox"]):focus-visible {
+  outline: 3px solid var(--color-signal-mint);
+  outline-offset: 3px;
+}
+
 .auth-form__help {
   color: var(--color-context-slate);
   font-size: var(--text-small);
@@ -1179,6 +1184,27 @@ p {
 
 .turnstile-widget {
   min-height: 65px;
+}
+
+.turnstile-widget__error {
+  background: rgb(184 62 75 / 10%);
+  border: 1px solid var(--color-error-dark);
+  border-radius: var(--radius-control);
+  color: var(--color-error-dark);
+  font-size: var(--text-small);
+  margin: 0;
+  padding: var(--space-3);
+}
+
+.turnstile-widget__error button {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+  padding: 0;
+  text-decoration: underline;
 }
 
 .auth-form__notice {

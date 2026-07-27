@@ -108,6 +108,7 @@ describe('AuthControls', () => {
     )
 
     expect(screen.getByText('Ada Lovelace')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Manage account security' }).getAttribute('href')).toBe('/account/security')
     expect(
       screen.getByRole('img', { name: 'Ada Lovelace profile' }),
     ).toBeTruthy()

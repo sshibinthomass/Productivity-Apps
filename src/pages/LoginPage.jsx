@@ -4,11 +4,15 @@ import TurnstileWidget from '../auth/TurnstileWidget.jsx'
 import { useAuth } from '../auth/authContext.js'
 import { getSafeReturnPath } from '../auth/returnPath.js'
 
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
 export default function LoginPage() {
   const { user, isAuthLoading, authError, signInWithEmail, registerWithEmail } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
-  const [mode, setMode] = useState('sign-in')
+  const [mode, setMode] = useState(location.state?.authMode === 'register' ? 'register' : 'sign-in')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
@@ -20,8 +24,10 @@ export default function LoginPage() {
   const emailRef = useRef(null)
   const passwordRef = useRef(null)
   const confirmationRef = useRef(null)
+  const consentRef = useRef(null)
   const returnPath = getSafeReturnPath(location.state?.from)
   const isRegistration = mode === 'register'
+  const verificationCallbackError = /(?:INVALID|EXPIRED).*(?:TOKEN|VERIFY)|(?:TOKEN|VERIFY).*(?:INVALID|EXPIRED)/i.test(new URLSearchParams(location.search).get('error') || '')
 
   if (isAuthLoading) {
     return <div className="auth-loading" role="status" aria-live="polite"><span className="auth-loading__signal" aria-hidden="true" /><p>Checking your session…</p></div>
@@ -38,11 +44,9 @@ export default function LoginPage() {
   async function submit(event) {
     event.preventDefault()
     setFormError('')
-    const submittedToken = turnstileToken
-    setTurnstileToken(null)
-    setTurnstileReset((value) => value + 1)
-    if (!email.trim()) {
-      setFormError('Enter your email address.')
+    if (isSubmitting) return
+    if (!isValidEmail(email.trim())) {
+      setFormError('Enter a valid email address.')
       emailRef.current?.focus()
       return
     }
@@ -51,16 +55,27 @@ export default function LoginPage() {
       passwordRef.current?.focus()
       return
     }
-    if (!submittedToken) return
     if (isRegistration) {
-      if (password.length < 10) return setFormError('Use at least 10 characters for your password.')
+      if (password.length < 10) {
+        setFormError('Use at least 10 characters for your password.')
+        passwordRef.current?.focus()
+        return
+      }
       if (password !== confirmation) {
         setFormError('Passwords must match')
         confirmationRef.current?.focus()
         return
       }
-      if (!consentAccepted) return setFormError('Accept the terms and privacy policy to continue.')
+      if (!consentAccepted) {
+        setFormError('Accept the terms and privacy policy to continue.')
+        consentRef.current?.focus()
+        return
+      }
     }
+    const submittedToken = turnstileToken
+    setTurnstileToken(null)
+    setTurnstileReset((value) => value + 1)
+    if (!submittedToken) return
     setIsSubmitting(true)
     try {
       if (isRegistration) {
@@ -99,17 +114,18 @@ export default function LoginPage() {
           <label htmlFor="login-email">Email address</label>
           <input id="login-email" ref={emailRef} type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required aria-describedby={formError ? 'login-error' : undefined} />
           <label htmlFor="login-password">Password</label>
-          <input id="login-password" ref={passwordRef} type="password" autoComplete={isRegistration ? 'new-password' : 'current-password'} value={password} onChange={(event) => setPassword(event.target.value)} required aria-describedby={isRegistration ? 'password-help' : formError ? 'login-error' : undefined} />
+          <input id="login-password" ref={passwordRef} type="password" autoComplete={isRegistration ? 'new-password' : 'current-password'} value={password} onChange={(event) => setPassword(event.target.value)} required aria-describedby={isRegistration ? `password-help${formError ? ' login-error' : ''}` : 'login-error'} />
           {isRegistration && <p id="password-help" className="auth-form__help">Use at least 10 characters.</p>}
           {isRegistration && <>
             <label htmlFor="login-confirm-password">Confirm password</label>
             <input id="login-confirm-password" ref={confirmationRef} type="password" autoComplete="new-password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} required aria-describedby={formError ? 'login-error' : undefined} />
-            <label className="auth-consent" htmlFor="terms-consent"><input id="terms-consent" type="checkbox" required checked={consentAccepted} onChange={(event) => setConsentAccepted(event.target.checked)} /> <span>I agree to the <Link to="/terms">Terms</Link> and <Link to="/privacy">Privacy Policy</Link>.</span></label>
+            <label className="auth-consent" htmlFor="terms-consent"><input id="terms-consent" ref={consentRef} type="checkbox" required checked={consentAccepted} onChange={(event) => setConsentAccepted(event.target.checked)} aria-describedby={formError ? 'login-error' : undefined} /> <span>I agree to the <Link to="/terms" state={{ authMode: 'register' }}>Terms</Link> and <Link to="/privacy" state={{ authMode: 'register' }}>Privacy Policy</Link>.</span></label>
           </>}
           <TurnstileWidget onVerify={setTurnstileToken} resetKey={turnstileReset} />
           <button className="button button--primary" type="submit" disabled={!turnstileToken || isSubmitting} aria-busy={isSubmitting}>{isSubmitting ? 'Working…' : isRegistration ? 'Create account' : 'Sign in'}</button>
         </form>
-        {(formError || authError) && <p id="login-error" className="login-card__error" role="alert">{formError || authError}</p>}
+        {verificationCallbackError && <p className="login-card__error" role="alert">Your verification link is invalid or has expired. <Link to="/verify-email">Resend verification email</Link></p>}
+        <p id="login-error" className="login-card__error" role="alert" hidden={!(formError || authError)}>{formError || authError}</p>
         {isRegistration ? <p className="login-card__public-note">Already have an account? <button className="auth-inline-button" type="button" onClick={() => switchMode('sign-in')}>Sign in instead</button></p> : <p className="login-card__public-note"><Link to="/forgot-password">Forgot password?</Link> Public mini-sites remain viewable by everyone.</p>}
       </section>
     </div>

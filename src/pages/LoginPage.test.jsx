@@ -118,4 +118,44 @@ describe('LoginPage', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Sign in' }).at(-1))
     await waitFor(() => expect(screen.getByText('Home page')).toBeTruthy())
   })
+
+  it('handles Better Auth verification callbacks with a safe resend path', () => {
+    useAuth.mockReturnValue(signedOut)
+    render(
+      <MemoryRouter initialEntries={['/login?error=INVALID_TOKEN']}>
+        <Routes><Route path="/login" element={<LoginPage />} /><Route path="/verify-email" element={<p>Verification destination</p>} /></Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('alert').textContent).toContain('verification link is invalid or has expired')
+    expect(screen.getByRole('link', { name: 'Resend verification email' }).getAttribute('href')).toBe('/verify-email')
+  })
+
+  it('rejects malformed email input before consuming the security check', () => {
+    const signInWithEmail = vi.fn()
+    useAuth.mockReturnValue({ ...signedOut, signInWithEmail })
+    renderLogin('/')
+    fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'not-an-email' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'long-password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Complete security check' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Sign in' }).at(-1))
+
+    expect(screen.getByRole('alert').textContent).toContain('valid email')
+    expect(document.activeElement).toBe(screen.getByLabelText('Email address'))
+    expect(signInWithEmail).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Email address').getAttribute('aria-describedby')).toBe('login-error')
+  })
+
+  it('focuses mandatory registration consent before consuming Turnstile', () => {
+    useAuth.mockReturnValue(signedOut)
+    renderLogin('/')
+    fireEvent.click(screen.getByRole('button', { name: 'Create an account' }))
+    fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'person@example.com' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'long-password' } })
+    fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'long-password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Complete security check' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+
+    expect(document.activeElement).toBe(screen.getByLabelText(/I agree to the Terms/))
+  })
 })

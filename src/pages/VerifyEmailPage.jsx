@@ -1,9 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import TurnstileWidget from '../auth/TurnstileWidget.jsx'
 import { useAuth } from '../auth/authContext.js'
 
 const resendDelay = 60
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
 
 export default function VerifyEmailPage() {
   const { authError, resendVerification } = useAuth()
@@ -13,30 +17,46 @@ export default function VerifyEmailPage() {
   const [turnstileReset, setTurnstileReset] = useState(0)
   const [cooldown, setCooldown] = useState(0)
   const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const emailRef = useRef(null)
+  const timerRef = useRef(null)
+
+  useEffect(() => () => {
+    if (timerRef.current) window.clearInterval(timerRef.current)
+  }, [])
 
   async function resend(event) {
     event.preventDefault()
+    setError('')
+    if (isSubmitting || cooldown) return
+    if (!isValidEmail(email.trim())) {
+      setError('Enter a valid email address.')
+      emailRef.current?.focus()
+      return
+    }
     const submittedToken = turnstileToken
     setTurnstileToken(null)
     setTurnstileReset((value) => value + 1)
-    if (!email || !submittedToken || cooldown) return
-    const result = await resendVerification({
-      email,
-      turnstileToken: submittedToken,
-      callbackURL: `${window.location.origin}/login`,
-    })
-    if (result) {
+    if (!submittedToken) return
+    setIsSubmitting(true)
+    try {
+      const result = await resendVerification({ email: email.trim(), turnstileToken: submittedToken, callbackURL: `${window.location.origin}/login` })
+      if (!result) return
       setMessage('Verification email sent. Check your inbox, then sign in.')
       setCooldown(resendDelay)
-      const timer = window.setInterval(() => {
+      timerRef.current = window.setInterval(() => {
         setCooldown((seconds) => {
           if (seconds <= 1) {
-            window.clearInterval(timer)
+            window.clearInterval(timerRef.current)
+            timerRef.current = null
             return 0
           }
           return seconds - 1
         })
       }, 1000)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -47,15 +67,16 @@ export default function VerifyEmailPage() {
         <div className="auth-card__identity" aria-hidden="true">IDENTITY / VERIFY TO PUBLISH</div>
         <h1 id="verify-email-title">Check your inbox.</h1>
         <p className="login-card__intro">Confirm your email before you start building public mini-sites.</p>
-        <form className="auth-form" onSubmit={resend}>
+        <form className="auth-form" onSubmit={resend} noValidate aria-busy={isSubmitting}>
           <label htmlFor="verify-email">Email address</label>
-          <input id="verify-email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+          <input id="verify-email" ref={emailRef} type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting || cooldown > 0} required aria-describedby="verify-error" />
           <TurnstileWidget onVerify={setTurnstileToken} resetKey={turnstileReset} />
-          <button className="button button--primary" type="submit" disabled={!email || !turnstileToken || cooldown > 0}>
-            {cooldown ? `Resend available in ${cooldown}s` : 'Resend verification email'}
+          <button className="button button--primary" type="submit" disabled={!email || !turnstileToken || cooldown > 0 || isSubmitting} aria-busy={isSubmitting}>
+            {isSubmitting ? 'Sending verification email…' : cooldown ? `Resend available in ${cooldown}s` : 'Resend verification email'}
           </button>
         </form>
-        {(authError || message) && <p className={authError ? 'login-card__error' : 'auth-form__notice'} role={authError ? 'alert' : 'status'}>{authError || message}</p>}
+        <p id="verify-error" className="login-card__error" role="alert" hidden={!(authError || error)}>{error || authError}</p>
+        {message && <p className="auth-form__notice" role="status">{message}</p>}
         <p className="login-card__public-note"><Link to="/login">Back to sign in</Link></p>
       </section>
     </div>

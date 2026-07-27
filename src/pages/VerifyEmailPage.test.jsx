@@ -17,4 +17,17 @@ describe('VerifyEmailPage', () => {
     await waitFor(() => expect(resendVerification).toHaveBeenCalledWith(expect.objectContaining({ email: 'person@example.com', turnstileToken: 'token' })))
     expect(screen.getByRole('button', { name: /Resend available in/ }).disabled).toBe(true)
   })
+
+  it('cleans the resend cooldown timer when the page unmounts', async () => {
+    const clearIntervalSpy = vi.spyOn(window, 'clearInterval')
+    const resendVerification = vi.fn().mockResolvedValue({ status: true })
+    useAuth.mockReturnValue({ authError: null, resendVerification })
+    const view = render(<MemoryRouter initialEntries={[{ pathname: '/verify-email', state: { email: 'person@example.com' } }]}><VerifyEmailPage /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: 'Complete security check' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Resend verification email' }))
+    await waitFor(() => expect(resendVerification).toHaveBeenCalled())
+    view.unmount()
+    expect(clearIntervalSpy).toHaveBeenCalled()
+    clearIntervalSpy.mockRestore()
+  })
 })
