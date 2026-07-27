@@ -44,6 +44,7 @@ jobs:
       - name: Build application
         run: npm run build
         env:
+          VITE_BASE_PATH: /Productivity-Apps/
           VITE_API_BASE_URL: https://api.shibinthomas.com
           VITE_PUBLIC_SITE_BASE_URL: https://links.shibinthomas.com
           VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
