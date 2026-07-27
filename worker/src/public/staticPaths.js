@@ -1,4 +1,4 @@
-const exactStaticShellPaths = new Set(['/', '/index.html', '/favicon.svg', '/404.html'])
+const exactStaticShellPaths = new Set(['/', '/index.html', '/favicon.svg'])
 const staticShellPrefixes = ['/assets/', '/fonts/', '/brand/']
 
 export function isStaticShellPath(pathname) {

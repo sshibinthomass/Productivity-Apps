@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router'
 import { useMiniSiteRepository } from './data/repositoryContext.js'
 import { publicSiteBaseUrl } from './data/miniSiteRepository.js'
 import { TEMPLATES } from './model/templates.js'

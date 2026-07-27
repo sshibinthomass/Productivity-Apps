@@ -130,7 +130,7 @@ export function readMiniSiteBootstrap(document) {
   if (!element) return null
 
   try {
-    const snapshot = JSON.parse(element.textContent ?? '')
+    const snapshot = JSON.parse(element.content?.textContent ?? element.textContent ?? '')
     if (!isRecord(snapshot) || snapshot.schemaVersion !== 1 || !validateSlug(snapshot.slug).valid || !Array.isArray(snapshot.blocks) || snapshot.blocks.length === 0 || snapshot.blocks.length > BLOCK_LIMIT) return null
     const blocks = snapshot.blocks.map(publicBlock)
     const theme = publicTheme(snapshot.theme)

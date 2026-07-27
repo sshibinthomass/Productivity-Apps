@@ -1,9 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MiniSiteRepositoryProvider } from './data/repositoryContext.jsx'
 import PublicMiniSitePage from './PublicMiniSitePage.jsx'
 import { readMiniSiteBootstrap } from './publicBootstrap.js'
+import { renderPublicPage } from '../../../worker/src/public/renderPage.js'
 
 function renderPublic(repository, slug = 'maya-studio', route = `/s/${slug}`) {
   return render(
@@ -51,11 +52,14 @@ const bootstrapSite = {
 }
 
 function injectBootstrap(site = bootstrapSite) {
-  const element = document.createElement('script')
+  const element = document.createElement('template')
   element.id = 'mini-site-bootstrap'
-  element.type = 'application/json'
-  element.textContent = JSON.stringify(site)
+  element.content.textContent = JSON.stringify(site)
   document.body.append(element)
+}
+
+function setBootstrapText(value) {
+  document.getElementById('mini-site-bootstrap').content.textContent = value
 }
 
 const publishedSite = {
@@ -104,6 +108,18 @@ describe('PublicMiniSitePage', () => {
     await waitFor(() => expect(repository.recordEvent).toHaveBeenCalledTimes(1))
   })
 
+  it('reads the template emitted by the Worker renderer', () => {
+    const html = renderPublicPage({
+      document: '<!doctype html><html><head></head><body></body></html>',
+      site: bootstrapSite,
+      origin: 'https://links.shibinthomas.com',
+    })
+    const rendered = new DOMParser().parseFromString(html, 'text/html')
+
+    expect(readMiniSiteBootstrap(rendered)?.slug).toBe('maya-studio')
+    expect(rendered.querySelector('script#mini-site-bootstrap')).toBeNull()
+  })
+
   it('uses public JSON when the document has no valid bootstrap snapshot', async () => {
     const repository = {
       getPublished: vi.fn().mockResolvedValue(publishedSite),
@@ -120,13 +136,13 @@ describe('PublicMiniSitePage', () => {
     injectBootstrap({ schemaVersion: 2, slug: 'maya-studio', blocks: [] })
     expect(readMiniSiteBootstrap(document)).toBeNull()
 
-    document.getElementById('mini-site-bootstrap').textContent = JSON.stringify({
+    setBootstrapText(JSON.stringify({
       ...bootstrapSite,
       theme: null,
-    })
+    }))
     expect(readMiniSiteBootstrap(document)).toBeNull()
 
-    document.getElementById('mini-site-bootstrap').textContent = '{not json'
+    setBootstrapText('{not json')
     expect(readMiniSiteBootstrap(document)).toBeNull()
   })
 

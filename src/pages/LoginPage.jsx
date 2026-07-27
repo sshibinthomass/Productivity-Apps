@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 import TurnstileWidget from '../auth/TurnstileWidget.jsx'
 import { useAuth } from '../auth/authContext.js'
 import { getSafeReturnPath } from '../auth/returnPath.js'

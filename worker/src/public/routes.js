@@ -38,6 +38,16 @@ function publicSite(snapshot, slug, revision) {
   return { schemaVersion: 1, slug, revision, blocks: Array.isArray(snapshot?.blocks) ? snapshot.blocks.map(publicBlock).filter(Boolean) : [], theme: publicTheme(snapshot?.theme), seo: { title: text(seo.title, 80), description: text(seo.description, 180), socialImageUrl: text(seo.socialImageUrl, 2048) || null } }
 }
 
+function publishedMediaUrls(site) {
+  const urls = new Set()
+  for (const block of site.blocks) {
+    if (block.type === 'image' && block.content.url) urls.add(block.content.url)
+    if (block.type === 'profile' && block.content.avatarUrl) urls.add(block.content.avatarUrl)
+  }
+  if (site.seo.socialImageUrl) urls.add(site.seo.socialImageUrl)
+  return urls
+}
+
 function decoded(value) { try { const result = decodeURIComponent(value); if (!result || result.includes('/') || result.includes('\\')) throw new Error(); return result } catch { throw new ApiError('not_found', 'Not found.', 404) } }
 function assetPath(pathname) { const match = /^\/assets\/([^/]+)\/(\d+)\/([^/]+)$/.exec(pathname); return match ? { siteId: decoded(match[1]), revision: Number(match[2]), assetId: decoded(match[3]) } : null }
 async function parseBody(request) {
@@ -69,7 +79,7 @@ export function createPublicRoutes({ db, assets, staticAssets, analytics, origin
     const row = await db.prepare('SELECT snapshot_json FROM published_sites WHERE site_id = ?1 AND revision = ?2 LIMIT 1').bind(asset.siteId, asset.revision).first()
     if (!row) return false
     const url = `${origin}/assets/${encodeURIComponent(asset.siteId)}/${encodeURIComponent(asset.revision)}/${encodeURIComponent(asset.assetId)}`
-    return JSON.stringify(publicSite(JSON.parse(row.snapshot_json), '', asset.revision)).includes(url)
+    return publishedMediaUrls(publicSite(JSON.parse(row.snapshot_json), '', asset.revision)).has(url)
   }
   async function staticFallback(request) {
     const response = staticAssets?.fetch ? await staticAssets.fetch(request) : notFound()

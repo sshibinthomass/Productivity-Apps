@@ -20,6 +20,7 @@ describe('mini-site domain validation', () => {
     { name: '', slug: 'maya-studio', templateId: 'creator' },
     { name: 'Maya', slug: 'ab', templateId: 'creator' },
     { name: 'Maya', slug: 'admin', templateId: 'creator' },
+    { name: 'Maya', slug: 'account', templateId: 'creator' },
     { name: 'Maya', slug: 'verify-email', templateId: 'creator' },
     { name: 'Maya', slug: 'Maya-studio', templateId: 'creator' },
     { name: 'Maya', slug: 'maya-studio', templateId: 'unknown' },
@@ -37,7 +38,7 @@ describe('mini-site domain validation', () => {
     for (const value of ['', 'a'.repeat(129)]) {
       expect(() => parseSiteId(value)).toThrowError(expect.objectContaining({ code: 'invalid_argument' }))
     }
-    for (const value of ['s', 'a-', 'api', 'verify-email', 'forgot-password', 'reset-password', 'Maya-Studio']) {
+    for (const value of ['s', 'a-', 'api', 'account', 'verify-email', 'forgot-password', 'reset-password', 'Maya-Studio']) {
       expect(() => parseSlug(value)).toThrowError(expect.objectContaining({ code: 'invalid_argument' }))
     }
   })

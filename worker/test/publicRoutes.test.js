@@ -108,7 +108,7 @@ describe('public mini-site routes', () => {
   })
 
   it('serves explicit shell asset paths from ASSETS without treating extensionless slugs as static', async () => {
-    const staticPaths = ['/', '/index.html', '/assets/app.js', '/fonts/display.woff2', '/brand/logo.svg', '/favicon.svg', '/404.html']
+    const staticPaths = ['/', '/index.html', '/assets/app.js', '/fonts/display.woff2', '/brand/logo.svg', '/favicon.svg']
     const staticRoutes = createPublicRoutes({
       db: { prepare() { throw new Error('Static paths must not query published sites.') } },
       assets: {}, analytics: {}, origin: publicOrigin,
@@ -130,6 +130,17 @@ describe('public mini-site routes', () => {
 
     expect(slug.status).toBe(200)
     expect(await slug.text()).toContain('id="mini-site-bootstrap"')
+  })
+
+  it('does not expose the GitHub Pages inline-script fallback through the Worker', async () => {
+    const response = await worker.fetch(
+      new Request(`${publicOrigin}/404.html`),
+      env,
+      createExecutionContext(),
+    )
+
+    expect(response.status).toBe(404)
+    expect(await response.text()).not.toContain('<script')
   })
 
   it('adds public browser hardening headers to static root and fallback assets', async () => {
@@ -167,5 +178,20 @@ describe('public mini-site routes', () => {
       const response = await worker.fetch(new Request(`${publicOrigin}${path}`), env, createExecutionContext())
       expect(response.status).toBe(404)
     }
+  })
+
+  it('does not authorize an asset URL mentioned only in non-media text', async () => {
+    const assetUrl = `${publicOrigin}/assets/private-site-id/3/hidden`
+    await seedPublishedSite(env.DB, { blocks: [{
+      id: 'note',
+      type: 'paragraph',
+      visible: true,
+      content: { text: `Internal reference: ${assetUrl}` },
+    }] })
+    await env.MEDIA.put('public/private-site-id/3/hidden', new Uint8Array([137, 80, 78, 71]))
+
+    const response = await worker.fetch(new Request(assetUrl), env, createExecutionContext())
+
+    expect(response.status).toBe(404)
   })
 })

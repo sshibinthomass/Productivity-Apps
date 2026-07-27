@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 
 export default function AppCard({ app, index = 0 }) {
   const Icon = app.icon

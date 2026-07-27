@@ -7,6 +7,7 @@ const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? ''
 const configuredApiHost = configuredApiBaseUrl ? new URL(configuredApiBaseUrl).hostname : ''
 const isLocalWorkerShell = loopbackHosts.has(globalThis.location?.hostname)
   && loopbackHosts.has(configuredApiHost)
+  && Boolean(globalThis.document?.getElementById?.('mini-site-bootstrap'))
 export const publicSiteBaseUrl = isLocalWorkerShell
   ? globalThis.location.origin
   : configuredPublicSiteBaseUrl

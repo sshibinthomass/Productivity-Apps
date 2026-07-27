@@ -25,7 +25,7 @@
     "qr-code-styling": "^1.9.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "react-router-dom": "7.18.1",
+    "react-router": "8.3.0",
     "resend": "6.18.0"
   },
   "devDependencies": {
@@ -47,6 +47,6 @@
     "lightningcss-linux-x64-gnu": "1.33.0"
   },
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.22.0"
   }
 }

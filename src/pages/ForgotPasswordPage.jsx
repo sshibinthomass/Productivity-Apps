@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import TurnstileWidget from '../auth/TurnstileWidget.jsx'
 import { useAuth } from '../auth/authContext.js'
 

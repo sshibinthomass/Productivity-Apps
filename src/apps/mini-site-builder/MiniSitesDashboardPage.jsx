@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { useAuth } from '../../auth/authContext.js'
 import { SITE_LIMIT } from './model/miniSiteModel.js'
 import { useMiniSiteRepository } from './data/repositoryContext.js'

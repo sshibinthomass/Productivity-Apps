@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams } from 'react-router'
 import { useMiniSiteRepository } from './data/repositoryContext.js'
 import { readMiniSiteBootstrap } from './publicBootstrap.js'
 import { MiniSiteRenderer } from './renderer/MiniSiteRenderer.jsx'

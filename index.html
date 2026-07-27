@@ -17,22 +17,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      ;(() => {
-        const url = new URL(window.location.href)
-        const route = url.searchParams.get('route')
-
-        if (!route || !route.startsWith('/') || route.startsWith('//')) {
-          return
-        }
-
-        window.history.replaceState(
-          null,
-          '',
-          route,
-        )
-      })()
-    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

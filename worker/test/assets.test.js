@@ -336,12 +336,13 @@ describe('R2 mini-site assets', () => {
   it('bounds cleanup work and continues from its persisted cursor without deleting a newly current revision', async () => {
     for (let number = 0; number < 30; number += 1) await env.MEDIA.put(`staging/site-1/2/attempt/${number}`, png)
     await env.MEDIA.put('public/site-1/4/reused', png)
-
-    await assets.cleanupObsoletePublicAssets({ now: new Date('2026-08-15T00:00:00.000Z'), graceMilliseconds: 0, pageSize: 25, deleteBudget: 25 })
-    expect((await env.MEDIA.list({ prefix: 'staging/' })).objects).toHaveLength(18)
-    await expect(env.DB.prepare("SELECT phase, cursor FROM maintenance_cursors WHERE name = 'public_asset_cleanup_staging'").first()).resolves.toMatchObject({ phase: 'staging', cursor: expect.any(String) })
     await env.DB.prepare(`INSERT INTO published_sites (slug, site_id, snapshot_json, title, description, revision, published_at)
       VALUES ('reused', 'site-1', ?1, '', '', 4, '2026-08-15T00:00:00.000Z')`).bind(JSON.stringify({ schemaVersion: 1, slug: 'reused', revision: 4, blocks: [{ id: 'image', type: 'image', visible: true, content: { url: 'https://links.shibinthomas.com/assets/site-1/4/reused' } }], theme: {}, seo: {} })).run()
+
+    await assets.cleanupObsoletePublicAssets({ now: new Date('2026-08-15T00:00:00.000Z'), graceMilliseconds: 0, pageSize: 25, deleteBudget: 25 })
+    expect((await env.MEDIA.list({ prefix: 'staging/' })).objects).toHaveLength(22)
+    await expect(env.DB.prepare("SELECT phase, cursor FROM maintenance_cursors WHERE name = 'public_asset_cleanup_staging'").first()).resolves.toMatchObject({ phase: 'staging', cursor: expect.any(String) })
+    await assets.cleanupObsoletePublicAssets({ now: new Date('2026-08-15T00:00:00.000Z'), graceMilliseconds: 0, pageSize: 25, deleteBudget: 25 })
     await assets.cleanupObsoletePublicAssets({ now: new Date('2026-08-15T00:00:00.000Z'), graceMilliseconds: 0, pageSize: 25, deleteBudget: 25 })
     await assets.cleanupObsoletePublicAssets({ now: new Date('2026-08-15T00:00:00.000Z'), graceMilliseconds: 0, pageSize: 25, deleteBudget: 25 })
     await expect(env.MEDIA.get('public/site-1/4/reused')).resolves.toBeTruthy()
@@ -361,23 +362,30 @@ describe('R2 mini-site assets', () => {
     await expect(env.MEDIA.get('public/site-1/4/race')).resolves.toBeTruthy()
   })
 
-  it('advances bounded public and staging cleanup cursors even when public listing never finishes', async () => {
+  it('gives public, staging, and draft cleanup a bounded share of every normal cleanup run', async () => {
     const calls = []
     const bucket = {
       async list({ prefix, cursor }) {
         calls.push({ prefix, cursor: cursor ?? null })
         if (prefix === 'public/') return { objects: [{ key: `public/site-1/1/${calls.length}`, uploaded: new Date('2026-01-01T00:00:00.000Z') }], truncated: true, cursor: `public-${calls.length}` }
-        return { objects: [{ key: 'staging/site-1/1/attempt/a', uploaded: new Date('2026-01-01T00:00:00.000Z') }], truncated: true, cursor: `staging-${calls.length}` }
+        if (prefix === 'staging/') return { objects: [{ key: 'staging/site-1/1/attempt/a', uploaded: new Date('2026-01-01T00:00:00.000Z') }], truncated: true, cursor: `staging-${calls.length}` }
+        return { objects: [{ key: 'drafts/owner-1/site-1/orphan', uploaded: new Date('2026-01-01T00:00:00.000Z') }], truncated: true, cursor: `draft-${calls.length}` }
       },
       async delete() {},
     }
     const cleanup = createAssetService({ bucket, db: env.DB, publicOrigin: 'https://links.shibinthomas.com' })
-    await cleanup.cleanupObsoletePublicAssets({ now: new Date('2026-08-15T00:00:00.000Z'), graceMilliseconds: 0, pageSize: 2, deleteBudget: 2 })
-    expect(calls.map(({ prefix }) => prefix)).toEqual(['public/', 'staging/'])
-    await expect(env.DB.prepare("SELECT name, cursor FROM maintenance_cursors WHERE name IN ('public_asset_cleanup_public', 'public_asset_cleanup_staging') ORDER BY name").all()).resolves.toMatchObject({ results: [{ name: 'public_asset_cleanup_public' }, { name: 'public_asset_cleanup_staging' }] })
+    await cleanup.cleanupObsoletePublicAssets({ now: new Date('2026-08-15T00:00:00.000Z'), graceMilliseconds: 0, pageSize: 25, deleteBudget: 25 })
+    expect(calls.map(({ prefix }) => prefix)).toEqual(['public/', 'staging/', 'drafts/'])
+    await expect(env.DB.prepare("SELECT name, cursor FROM maintenance_cursors WHERE name LIKE 'public_asset_cleanup_%' AND name != 'public_asset_cleanup_scheduler' ORDER BY name").all()).resolves.toMatchObject({
+      results: [
+        { name: 'public_asset_cleanup_draft' },
+        { name: 'public_asset_cleanup_public' },
+        { name: 'public_asset_cleanup_staging' },
+      ],
+    })
   })
 
-  it('alternates a one-object cleanup budget so sustained public growth cannot starve staging cleanup', async () => {
+  it('rotates a one-object cleanup budget so sustained growth cannot starve any phase', async () => {
     const calls = []
     const bucket = {
       async list({ prefix }) {
@@ -390,8 +398,21 @@ describe('R2 mini-site assets', () => {
 
     await cleanup.cleanupObsoletePublicAssets({ now: new Date('2026-08-15T00:00:00.000Z'), graceMilliseconds: 0, pageSize: 1, deleteBudget: 1 })
     await cleanup.cleanupObsoletePublicAssets({ now: new Date('2026-08-15T00:00:00.000Z'), graceMilliseconds: 0, pageSize: 1, deleteBudget: 1 })
+    await cleanup.cleanupObsoletePublicAssets({ now: new Date('2026-08-15T00:00:00.000Z'), graceMilliseconds: 0, pageSize: 1, deleteBudget: 1 })
 
-    expect(calls).toEqual(['public/', 'staging/'])
+    expect(calls).toEqual(['public/', 'staging/', 'drafts/'])
+  })
+
+  it('deletes an aged public object after its publication row is gone', async () => {
+    await env.MEDIA.put('public/deleted-site/7/orphan', png)
+
+    await assets.cleanupObsoletePublicAssets({
+      now: new Date('2026-08-15T00:00:00.000Z'),
+      graceMilliseconds: 0,
+      deleteBudget: 25,
+    })
+
+    await expect(env.MEDIA.get('public/deleted-site/7/orphan')).resolves.toBeNull()
   })
 
   it('removes an aged draft object with no D1 asset reference', async () => {

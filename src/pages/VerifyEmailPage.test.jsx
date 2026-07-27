@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { useAuth } from '../auth/authContext.js'
 import VerifyEmailPage from './VerifyEmailPage.jsx'

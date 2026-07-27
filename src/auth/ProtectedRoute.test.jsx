@@ -4,7 +4,7 @@ import {
   Route,
   Routes,
   useLocation,
-} from 'react-router-dom'
+} from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useAuth } from './authContext.js'
 import ProtectedRoute from './ProtectedRoute.jsx'

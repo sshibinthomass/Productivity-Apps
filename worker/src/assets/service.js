@@ -267,22 +267,33 @@ export function createAssetService({ bucket, db, publicOrigin, apiOrigin = 'http
   async function cleanupObsoletePublicAssets({ now = new Date(), graceMilliseconds = 7 * 24 * 60 * 60 * 1000, pageSize = 25, deleteBudget = 25 } = {}) {
     const cutoff = new Date(now.getTime() - graceMilliseconds)
     const budget = Math.max(0, Math.floor(deleteBudget))
-    if (budget === 1) {
-      const scheduler = await db.prepare("SELECT phase FROM maintenance_cursors WHERE name = 'public_asset_cleanup_scheduler'").first()
-      const phase = scheduler?.phase ?? 'public'
+    if (budget < 1) return
+    const phases = [
+      { phase: 'public', prefix: 'public/' },
+      { phase: 'staging', prefix: 'staging/' },
+      { phase: 'draft', prefix: 'drafts/' },
+    ]
+    const scheduler = await db.prepare("SELECT phase FROM maintenance_cursors WHERE name = 'public_asset_cleanup_scheduler'").first()
+    const start = Math.max(0, phases.findIndex(({ phase }) => phase === scheduler?.phase))
+    const phaseCount = Math.min(phases.length, budget)
+    const baseBudget = Math.floor(budget / phaseCount)
+    const remainder = budget % phaseCount
+    for (let index = 0; index < phaseCount; index += 1) {
+      const { phase, prefix } = phases[(start + index) % phases.length]
       await cleanupPrefix({
         name: `public_asset_cleanup_${phase}`,
-        prefix: phase === 'public' ? 'public/' : phase === 'staging' ? 'staging/' : 'drafts/',
-        budget, pageSize, cutoff, now, phase,
+        prefix,
+        budget: baseBudget + (index < remainder ? 1 : 0),
+        pageSize,
+        cutoff,
+        now,
+        phase,
       })
-      await db.prepare(`INSERT INTO maintenance_cursors (name, phase, cursor, updated_at) VALUES ('public_asset_cleanup_scheduler', ?1, NULL, ?2)
-        ON CONFLICT(name) DO UPDATE SET phase = excluded.phase, cursor = NULL, updated_at = excluded.updated_at`)
-        .bind(phase === 'public' ? 'staging' : phase === 'staging' ? 'draft' : 'public', now.toISOString()).run()
-      return
     }
-    const publicBudget = Math.ceil(budget / 2); const stagingBudget = budget - publicBudget
-    await cleanupPrefix({ name: 'public_asset_cleanup_public', prefix: 'public/', budget: publicBudget, pageSize, cutoff, now, phase: 'public' })
-    await cleanupPrefix({ name: 'public_asset_cleanup_staging', prefix: 'staging/', budget: stagingBudget, pageSize, cutoff, now, phase: 'staging' })
+    const nextPhase = phases[(start + phaseCount) % phases.length].phase
+    await db.prepare(`INSERT INTO maintenance_cursors (name, phase, cursor, updated_at) VALUES ('public_asset_cleanup_scheduler', ?1, NULL, ?2)
+      ON CONFLICT(name) DO UPDATE SET phase = excluded.phase, cursor = NULL, updated_at = excluded.updated_at`)
+      .bind(nextPhase, now.toISOString()).run()
   }
 
   async function cleanupPrefix({ name, prefix, budget, pageSize, cutoff, now, phase }) {
@@ -310,10 +321,9 @@ export function createAssetService({ bucket, db, publicOrigin, apiOrigin = 'http
     const match = /^public\/([^/]+)\/(\d+)\/[^/]+$/.exec(key)
     if (!match) return false
     const published = await db.prepare('SELECT revision FROM published_sites WHERE site_id = ?1 LIMIT 1').bind(match[1]).first()
-    // A publication row can arrive immediately after R2 promotion. The normal
-    // grace window protects that hand-off; retaining an entirely unpublished
-    // site also avoids deleting a just-promoted object during a retry.
-    return Boolean(published && Number(match[2]) !== published.revision)
+    // The age gate protects the R2-to-D1 publish hand-off. Recheck D1
+    // immediately before deletion so a newly current revision wins the race.
+    return !published || Number(match[2]) !== published.revision
   }
 
   async function obsoleteDraftObject(key) {

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { useAuth } from '../auth/authContext.js'
 
 function isInvalidToken(error) {

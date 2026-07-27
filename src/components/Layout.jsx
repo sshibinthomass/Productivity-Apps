@@ -1,4 +1,4 @@
-import { Link, Outlet, useLocation } from 'react-router-dom'
+import { Link, Outlet, useLocation } from 'react-router'
 import AuthControls from './AuthControls.jsx'
 import BrandLogo from './BrandLogo.jsx'
 import ThemeToggle from './ThemeToggle.jsx'

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApiClient } from '../../../api/apiClient.js'
 import { createDraft } from '../model/miniSiteModel.js'
 import { createMiniSiteRepository } from './miniSiteRepository.js'
@@ -9,7 +9,39 @@ function createApi() {
   }
 }
 
+afterEach(() => {
+  document.getElementById('mini-site-bootstrap')?.remove()
+  vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
+  vi.resetModules()
+})
+
 describe('mini-site repository HTTP contracts', () => {
+  it('keeps the configured Worker URL for the separate Vite management shell', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'http://127.0.0.1:8787')
+    vi.stubEnv('VITE_PUBLIC_SITE_BASE_URL', 'http://127.0.0.1:8787')
+    vi.stubGlobal('location', { hostname: 'localhost', origin: 'http://localhost:5173' })
+    vi.resetModules()
+
+    const { publicSiteBaseUrl } = await import('./miniSiteRepository.js')
+
+    expect(publicSiteBaseUrl).toBe('http://127.0.0.1:8787')
+  })
+
+  it('uses the current Worker origin only for a loopback public bootstrap shell', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'http://127.0.0.1:8787')
+    vi.stubEnv('VITE_PUBLIC_SITE_BASE_URL', 'https://links.shibinthomas.com')
+    vi.stubGlobal('location', { hostname: '127.0.0.1', origin: 'http://127.0.0.1:8787' })
+    const marker = document.createElement('template')
+    marker.id = 'mini-site-bootstrap'
+    document.body.append(marker)
+    vi.resetModules()
+
+    const { publicSiteBaseUrl } = await import('./miniSiteRepository.js')
+
+    expect(publicSiteBaseUrl).toBe('http://127.0.0.1:8787')
+  })
+
   it('uses management endpoints, normalizes drafts, and ignores legacy uid arguments', async () => {
     const api = createApi()
     const source = { siteId: 'site-1', ...createDraft({ name: 'Maya Studio', slug: 'maya-studio', templateId: 'creator' }) }
