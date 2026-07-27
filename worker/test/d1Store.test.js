@@ -45,6 +45,18 @@ describe('D1 mini-site store', () => {
     ])
   })
 
+  it('includes durable analytics totals while preserving zeroes for sites without events', async () => {
+    await create(store, { siteId: 'active', slug: 'active-page' })
+    await create(store, { siteId: 'quiet', slug: 'quiet-page' })
+    await env.DB.prepare('INSERT INTO analytics_summary (site_id, view_count, click_count) VALUES (?1, ?2, ?3)')
+      .bind('active', 12, 3).run()
+
+    await expect(store.list({ userId: 'user-1' })).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ siteId: 'active', analytics: { totalViews: 12, totalClicks: 3 } }),
+      expect.objectContaining({ siteId: 'quiet', analytics: { totalViews: 0, totalClicks: 0 } }),
+    ]))
+  })
+
   it('treats a different owner\'s site as absent', async () => {
     await create(store)
 

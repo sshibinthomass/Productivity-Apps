@@ -1,10 +1,21 @@
 import { ApiError } from '../http/errors.js'
+import { readBoundedFormData } from '../http/body.js'
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+const MAX_MULTIPART_BYTES = MAX_IMAGE_BYTES + (64 * 1024)
+export const OWNER_ASSET_LIMIT = 100
+export const OWNER_ASSET_BYTES_LIMIT = 50 * 1024 * 1024
 const SUPPORTED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
 
 function assetError(message, status = 400) {
   return new ApiError('invalid_asset', message, status)
+}
+
+function quotaError(error) {
+  if (String(error?.message ?? error).includes('asset_quota_exceeded')) {
+    return new ApiError('asset_quota_exceeded', `Your account can store up to ${OWNER_ASSET_LIMIT} images or 50 MiB of media.`, 413)
+  }
+  return error
 }
 
 function hasPrefix(bytes, prefix) {
@@ -108,7 +119,7 @@ export function createAssetService({ bucket, db, publicOrigin, apiOrigin = 'http
   async function uploadDraft({ userId, siteId, file, request } = {}) {
     await ownedSite(userId, siteId)
     if (!file && request) {
-      const form = await request.formData()
+      const form = await readBoundedFormData(request, { maxBytes: MAX_MULTIPART_BYTES, message: 'Image uploads must not exceed 5 MiB.' })
       file = form.get('file')
     }
     if (!file || typeof file.arrayBuffer !== 'function' || !Number.isFinite(file.size)) throw assetError('Choose an image file to upload.')
@@ -129,7 +140,7 @@ export function createAssetService({ bucket, db, publicOrigin, apiOrigin = 'http
       if (metadata.meta.changes !== 1) throw new ApiError('not_found', 'This mini-site could not be found.', 404)
     } catch (error) {
       await bucket.delete(objectKey)
-      throw error
+      throw quotaError(error)
     }
     return { assetId, storagePath: objectKey, url: `${apiOrigin}/v1/sites/${encodeURIComponent(siteId)}/assets/${encodeURIComponent(assetId)}` }
   }
@@ -146,6 +157,39 @@ export function createAssetService({ bucket, db, publicOrigin, apiOrigin = 'http
 
   async function getPublic({ siteId, revision, assetId } = {}) {
     return bucket.get(`public/${siteId}/${revision}/${assetId}`)
+  }
+
+  async function cloneReferenced({ userId, sourceSiteId, targetSiteId, draft } = {}) {
+    await ownedSite(userId, sourceSiteId)
+    await ownedSite(userId, targetSiteId)
+    const { results } = await db.prepare(`SELECT id, object_key, content_type, size_bytes FROM site_assets
+      WHERE site_id = ?1 AND owner_id = ?2`).bind(sourceSiteId, userId).all()
+    const sourceAssets = new Map(results.map((asset) => [asset.object_key, asset]))
+    const nextDraft = structuredClone(draft)
+    const replacements = new Map()
+    const created = []
+    async function clone(path) {
+      if (!path || replacements.has(path)) return replacements.get(path) ?? path
+      const source = sourceAssets.get(path)
+      if (!source) return path
+      const assetId = createId(); const objectKey = `drafts/${userId}/${targetSiteId}/${assetId}`
+      const object = await bucket.get(source.object_key)
+      if (!object) throw assetError('The draft references an unavailable image.')
+      await bucket.put(objectKey, object.body, { httpMetadata: { contentType: source.content_type, contentDisposition: contentDisposition(assetId) } })
+      try {
+        await db.prepare('INSERT INTO site_assets (id, site_id, owner_id, object_key, content_type, size_bytes) VALUES (?1, ?2, ?3, ?4, ?5, ?6)')
+          .bind(assetId, targetSiteId, userId, objectKey, source.content_type, source.size_bytes).run()
+      } catch (error) { await bucket.delete(objectKey); throw quotaError(error) }
+      created.push(objectKey); replacements.set(path, objectKey); return objectKey
+    }
+    try {
+      for (const block of nextDraft.blocks ?? []) {
+        if (block?.type === 'image' && block.content?.storagePath) block.content.storagePath = await clone(block.content.storagePath)
+        if (block?.type === 'profile' && block.content?.avatarStoragePath) block.content.avatarStoragePath = await clone(block.content.avatarStoragePath)
+      }
+      if (nextDraft.seo?.socialImagePath) nextDraft.seo.socialImagePath = await clone(nextDraft.seo.socialImagePath)
+      return { draft: nextDraft, assetKeys: created }
+    } catch (error) { await Promise.all(created.map((key) => bucket.delete(key))); throw error }
   }
 
   async function promoteReferenced({ userId, siteId, draft, attemptId } = {}) {
@@ -225,37 +269,40 @@ export function createAssetService({ bucket, db, publicOrigin, apiOrigin = 'http
     const budget = Math.max(0, Math.floor(deleteBudget))
     if (budget === 1) {
       const scheduler = await db.prepare("SELECT phase FROM maintenance_cursors WHERE name = 'public_asset_cleanup_scheduler'").first()
-      const publicObject = scheduler?.phase !== 'staging'
+      const phase = scheduler?.phase ?? 'public'
       await cleanupPrefix({
-        name: publicObject ? 'public_asset_cleanup_public' : 'public_asset_cleanup_staging',
-        prefix: publicObject ? 'public/' : 'staging/', budget, pageSize, cutoff, now, publicObject,
+        name: `public_asset_cleanup_${phase}`,
+        prefix: phase === 'public' ? 'public/' : phase === 'staging' ? 'staging/' : 'drafts/',
+        budget, pageSize, cutoff, now, phase,
       })
       await db.prepare(`INSERT INTO maintenance_cursors (name, phase, cursor, updated_at) VALUES ('public_asset_cleanup_scheduler', ?1, NULL, ?2)
         ON CONFLICT(name) DO UPDATE SET phase = excluded.phase, cursor = NULL, updated_at = excluded.updated_at`)
-        .bind(publicObject ? 'staging' : 'public', now.toISOString()).run()
+        .bind(phase === 'public' ? 'staging' : phase === 'staging' ? 'draft' : 'public', now.toISOString()).run()
       return
     }
     const publicBudget = Math.ceil(budget / 2); const stagingBudget = budget - publicBudget
-    await cleanupPrefix({ name: 'public_asset_cleanup_public', prefix: 'public/', budget: publicBudget, pageSize, cutoff, now, publicObject: true })
-    await cleanupPrefix({ name: 'public_asset_cleanup_staging', prefix: 'staging/', budget: stagingBudget, pageSize, cutoff, now, publicObject: false })
+    await cleanupPrefix({ name: 'public_asset_cleanup_public', prefix: 'public/', budget: publicBudget, pageSize, cutoff, now, phase: 'public' })
+    await cleanupPrefix({ name: 'public_asset_cleanup_staging', prefix: 'staging/', budget: stagingBudget, pageSize, cutoff, now, phase: 'staging' })
   }
 
-  async function cleanupPrefix({ name, prefix, budget, pageSize, cutoff, now, publicObject }) {
+  async function cleanupPrefix({ name, prefix, budget, pageSize, cutoff, now, phase }) {
     if (budget < 1) return
     const state = await db.prepare('SELECT cursor FROM maintenance_cursors WHERE name = ?1').bind(name).first()
     const page = await bucket.list({ prefix, ...(state?.cursor ? { cursor: state.cursor } : {}), limit: Math.min(pageSize, budget) })
     let deleted = 0
     for (const object of page.objects) {
-      if (deleted >= budget || !(object.uploaded instanceof Date) || object.uploaded >= cutoff) continue
+      const uploaded = new Date(object.uploaded)
+      if (deleted >= budget || Number.isNaN(uploaded.getTime()) || uploaded >= cutoff) continue
       let eligible = true
-      if (publicObject) {
+      if (phase === 'public') {
         await beforePublicDelete?.(object.key)
         eligible = await obsoletePublicRevision(object.key)
       }
+      if (phase === 'draft') eligible = await obsoleteDraftObject(object.key)
       if (eligible) { await bucket.delete(object.key); deleted += 1 }
     }
     if (page.truncated) await db.prepare(`INSERT INTO maintenance_cursors (name, phase, cursor, updated_at) VALUES (?1, ?2, ?3, ?4)
-      ON CONFLICT(name) DO UPDATE SET cursor = excluded.cursor, updated_at = excluded.updated_at`).bind(name, publicObject ? 'public' : 'staging', page.cursor, now.toISOString()).run()
+      ON CONFLICT(name) DO UPDATE SET cursor = excluded.cursor, updated_at = excluded.updated_at`).bind(name, phase, page.cursor, now.toISOString()).run()
     else await db.prepare('DELETE FROM maintenance_cursors WHERE name = ?1').bind(name).run()
   }
 
@@ -263,9 +310,17 @@ export function createAssetService({ bucket, db, publicOrigin, apiOrigin = 'http
     const match = /^public\/([^/]+)\/(\d+)\/[^/]+$/.exec(key)
     if (!match) return false
     const published = await db.prepare('SELECT revision FROM published_sites WHERE site_id = ?1 LIMIT 1').bind(match[1]).first()
-    // A missing publication may be in-flight. Only an already newer revision proves this key obsolete.
-    return Boolean(published && Number(match[2]) < published.revision)
+    // A publication row can arrive immediately after R2 promotion. The normal
+    // grace window protects that hand-off; retaining an entirely unpublished
+    // site also avoids deleting a just-promoted object during a retry.
+    return Boolean(published && Number(match[2]) !== published.revision)
   }
 
-  return { uploadDraft, getDraft, getPublic, promoteReferenced, deleteSiteAssets, cleanupObsolete, cleanupObsoletePublicAssets }
+  async function obsoleteDraftObject(key) {
+    if (!/^drafts\/[^/]+\/[^/]+\/[^/]+$/.test(key)) return false
+    const asset = await db.prepare('SELECT id FROM site_assets WHERE object_key = ?1 LIMIT 1').bind(key).first()
+    return !asset
+  }
+
+  return { uploadDraft, getDraft, getPublic, cloneReferenced, promoteReferenced, deleteSiteAssets, cleanupObsolete, cleanupObsoletePublicAssets }
 }

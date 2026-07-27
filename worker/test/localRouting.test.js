@@ -21,7 +21,7 @@ async function seedPublishedSite() {
     schemaVersion: 1,
     slug: 'maya-links',
     revision: 3,
-    blocks: [],
+    blocks: [{ id: 'avatar', type: 'image', visible: true, content: { url: 'http://localhost:8787/assets/local-site/3/avatar', alt: 'Avatar' } }],
     theme: {},
     seo: { title: 'Maya', description: 'A public page', socialImageUrl: null },
   }

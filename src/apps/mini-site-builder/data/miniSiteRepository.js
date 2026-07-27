@@ -1,8 +1,15 @@
 import { createApiClient } from '../../../api/apiClient.js'
 import { normalizeDraft } from '../model/miniSiteModel.js'
 
-export const publicSiteBaseUrl =
-  import.meta.env.VITE_PUBLIC_SITE_BASE_URL ?? 'https://links.shibinthomas.com'
+const configuredPublicSiteBaseUrl = import.meta.env.VITE_PUBLIC_SITE_BASE_URL ?? 'https://links.shibinthomas.com'
+const loopbackHosts = new Set(['localhost', '127.0.0.1', '[::1]'])
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? ''
+const configuredApiHost = configuredApiBaseUrl ? new URL(configuredApiBaseUrl).hostname : ''
+const isLocalWorkerShell = loopbackHosts.has(globalThis.location?.hostname)
+  && loopbackHosts.has(configuredApiHost)
+export const publicSiteBaseUrl = isLocalWorkerShell
+  ? globalThis.location.origin
+  : configuredPublicSiteBaseUrl
 
 export function publicMiniSiteUrl(slug) {
   const baseUrl = publicSiteBaseUrl.replace(/\/+$/, '')

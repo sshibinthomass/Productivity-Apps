@@ -19,6 +19,7 @@ function accountRequest(path, body, options = {}) {
     origin = appOrigin,
     token = '1x0000000000000000000000000000000AA',
     consent = '2026-07-26',
+    forwardedFor,
   } = options
   return new Request(`https://api.shibinthomas.com${path}`, {
     method: 'POST',
@@ -27,6 +28,7 @@ function accountRequest(path, body, options = {}) {
       'Content-Type': 'application/json',
       'X-Turnstile-Token': token,
       'X-Consent-Version': consent,
+      ...(forwardedFor ? { 'X-Forwarded-For': forwardedFor } : {}),
       ...(cookie ? { Cookie: cookie } : {}),
     },
     body: JSON.stringify(body),
@@ -206,6 +208,22 @@ describe('Better Auth email sessions', () => {
       createExecutionContext(),
     )
 
+    expect(response.status).toBe(429)
+  })
+
+  it('cannot bypass a per-email sign-up limit by rotating networks', async () => {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await worker.fetch(accountRequest('/auth/sign-up/email', { name: 'Person', email, password }, { forwardedFor: `203.0.113.${attempt + 1}` }), env, createExecutionContext())
+    }
+    const response = await worker.fetch(accountRequest('/auth/sign-up/email', { name: 'Person', email, password }, { forwardedFor: '203.0.113.99' }), env, createExecutionContext())
+    expect(response.status).toBe(429)
+  })
+
+  it('cannot bypass a per-network sign-up limit by rotating emails', async () => {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await worker.fetch(accountRequest('/auth/sign-up/email', { name: 'Person', email: `person-${attempt}@example.com`, password }, { forwardedFor: '203.0.113.10' }), env, createExecutionContext())
+    }
+    const response = await worker.fetch(accountRequest('/auth/sign-up/email', { name: 'Person', email: 'person-extra@example.com', password }, { forwardedFor: '203.0.113.10' }), env, createExecutionContext())
     expect(response.status).toBe(429)
   })
 
@@ -405,6 +423,16 @@ describe('Better Auth email sessions', () => {
     )
     expect(signedOutChange.status).toBe(401)
 
+    const wrongCurrent = await worker.fetch(
+      accountRequest('/auth/change-password', {
+        currentPassword: 'wrong-password',
+        newPassword: replacementPassword,
+      }, { cookie: signedInCookie }),
+      env,
+      createExecutionContext(),
+    )
+    expect(wrongCurrent.status).toBe(400)
+
     const changed = await worker.fetch(
       accountRequest('/auth/change-password', {
         currentPassword: password,
@@ -431,6 +459,29 @@ describe('Better Auth email sessions', () => {
       createExecutionContext(),
     )
     expect(newPassword.status).toBe(200)
+  })
+
+  it('enforces the password-change request contract before authentication', async () => {
+    const missingOrigin = await worker.fetch(new Request('https://api.shibinthomas.com/auth/change-password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    }), env, createExecutionContext())
+    const untrustedOrigin = await worker.fetch(accountRequest('/auth/change-password', {}, { origin: 'https://attacker.example' }), env, createExecutionContext())
+    const wrongMethod = await worker.fetch(new Request('https://api.shibinthomas.com/auth/change-password', { headers: { Origin: appOrigin } }), env, createExecutionContext())
+    const wrongMedia = await worker.fetch(new Request('https://api.shibinthomas.com/auth/change-password', {
+      method: 'POST', headers: { Origin: appOrigin, 'Content-Type': 'text/plain' }, body: 'nope',
+    }), env, createExecutionContext())
+    const malformed = await worker.fetch(new Request('https://api.shibinthomas.com/auth/change-password', {
+      method: 'POST', headers: { Origin: appOrigin, 'Content-Type': 'application/json' }, body: '{',
+    }), env, createExecutionContext())
+
+    expect(missingOrigin.status).toBe(403)
+    expect(untrustedOrigin.status).toBe(403)
+    expect(wrongMethod.status).toBe(404)
+    expect(wrongMedia.status).toBe(415)
+    expect(malformed.status).toBe(400)
+    for (const response of [missingOrigin, untrustedOrigin, wrongMedia, malformed]) {
+      expect(JSON.stringify(await response.clone().json())).not.toMatch(/password|session|token/i)
+    }
   })
 
   it('does not expose Better Auth session introspection routes', async () => {

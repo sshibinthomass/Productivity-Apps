@@ -65,6 +65,12 @@ function network(request) { return request.headers.get('CF-Connecting-IP') ?? re
 
 export function createPublicRoutes({ db, assets, staticAssets, analytics, origin }) {
   async function findSite(slug) { const row = await db.prepare('SELECT slug, snapshot_json, revision FROM published_sites WHERE slug = ?1 LIMIT 1').bind(slug).first(); return row ? publicSite(JSON.parse(row.snapshot_json), row.slug, row.revision) : null }
+  async function publishedAsset(asset) {
+    const row = await db.prepare('SELECT snapshot_json FROM published_sites WHERE site_id = ?1 AND revision = ?2 LIMIT 1').bind(asset.siteId, asset.revision).first()
+    if (!row) return false
+    const url = `${origin}/assets/${encodeURIComponent(asset.siteId)}/${encodeURIComponent(asset.revision)}/${encodeURIComponent(asset.assetId)}`
+    return JSON.stringify(publicSite(JSON.parse(row.snapshot_json), '', asset.revision)).includes(url)
+  }
   async function staticFallback(request) {
     const response = staticAssets?.fetch ? await staticAssets.fetch(request) : notFound()
     const result = new Headers(response.headers)
@@ -75,7 +81,7 @@ export function createPublicRoutes({ db, assets, staticAssets, analytics, origin
   return { async handle(request) {
     try {
       const { pathname } = new URL(request.url); const asset = assetPath(pathname)
-      if (asset) { const object = await assets.getPublic(asset); if (!object) return notFound(); const result = new Headers(headers(ASSET_CACHE)); object.writeHttpMetadata(result); result.set('Content-Type', object.httpMetadata?.contentType ?? 'application/octet-stream'); return new Response(object.body, { headers: result }) }
+      if (asset) { if (!(await publishedAsset(asset))) return notFound(); const object = await assets.getPublic(asset); if (!object) return notFound(); const result = new Headers(headers(ASSET_CACHE)); object.writeHttpMetadata(result); result.set('Content-Type', object.httpMetadata?.contentType ?? 'application/octet-stream'); return new Response(object.body, { headers: result }) }
       const jsonMatch = /^\/v1\/public\/sites\/([^/]+)$/.exec(pathname); const eventMatch = /^\/v1\/public\/sites\/([^/]+)\/events$/.exec(pathname)
       if (eventMatch) { if (request.method !== 'POST') return notFound(); return Response.json(await analytics.record({ slug: decoded(eventMatch[1]), data: await parseBody(request), network: network(request) }), { headers: headers('no-store') }) }
       if (jsonMatch) { if (request.method !== 'GET') return notFound(); const site = await findSite(decoded(jsonMatch[1])); return site ? Response.json({ site }, { headers: headers(PUBLIC_CACHE) }) : notFound() }

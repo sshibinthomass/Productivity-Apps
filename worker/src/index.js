@@ -6,6 +6,7 @@ import { verifyTurnstile } from './auth/turnstile.js'
 import { validateEnv } from './env.js'
 import { isAllowedOrigin, isLocalDevelopmentOrigin, isLocalRuntimeHostname, withCors } from './http/cors.js'
 import { ApiError, errorResponse } from './http/errors.js'
+import { readBoundedJson } from './http/body.js'
 import { requireUser } from './auth/session.js'
 import { createD1Store } from './sites/d1Store.js'
 import { createMiniSiteService } from './sites/service.js'
@@ -67,10 +68,8 @@ function hasLocalRuntimeConfiguration(env) {
 }
 
 export function isLocalRuntimeRequest(request, env) {
-  const cf = request.cf
   return hasLocalRuntimeConfiguration(env)
     && !request.headers.has('CF-Ray')
-    && (cf === undefined || cf === null || Object.keys(cf).length === 0)
 }
 
 function requestBranch(request, runtimeEnv) {
@@ -97,14 +96,6 @@ export function localRuntimeEnvironment(env, localRequest = false) {
     APP_ORIGIN: env.DEV_ORIGIN,
     API_ORIGIN: env.LOCAL_API_ORIGIN,
     PUBLIC_SITE_ORIGIN: env.LOCAL_API_ORIGIN,
-  }
-}
-
-async function requestBody(request) {
-  try {
-    return await request.clone().json()
-  } catch {
-    return null
   }
 }
 
@@ -218,14 +209,22 @@ async function handleAuthRequest(request, env, auth, dependencies, localRequest)
   const { pathname } = new URL(request.url)
   const limit = protectedAuthRoutes.get(pathname)
 
-  if (limit && request.method === 'POST') {
-    const body = await requestBody(request)
-    const email = normalizedEmail(body)
+  if (pathname === '/auth/change-password' && request.method === 'POST') {
+    if (!isAllowedOrigin(request.headers.get('Origin'), env)) throw new ApiError('invalid_origin', 'Invalid request origin.', 403)
+    if (!isJsonContentType(request)) throw new ApiError('unsupported_media_type', 'Use application/json for this request.', 415)
+    await readBoundedJson(request.clone(), { maxBytes: 64 * 1024, message: 'Authentication request bodies must not exceed 64 KiB.' })
+  }
 
+  if (limit && request.method === 'POST') {
     const origin = request.headers.get('Origin')
     if (!isAllowedOrigin(origin, env)) {
       throw new ApiError('invalid_origin', 'Invalid request origin.', 403)
     }
+    if (!isJsonContentType(request)) {
+      throw new ApiError('unsupported_media_type', 'Use application/json for this request.', 415)
+    }
+    const body = await readBoundedJson(request.clone(), { maxBytes: 64 * 1024, message: 'Authentication request bodies must not exceed 64 KiB.' })
+    const email = normalizedEmail(body)
 
     if (pathname === '/auth/sign-up/email'
       && request.headers.get('X-Consent-Version') !== consentVersion) {
@@ -238,8 +237,16 @@ async function handleAuthRequest(request, env, auth, dependencies, localRequest)
 
     await enforceRateLimit({
       db: env.DB,
-      scope: limit.scope,
-      identity: `${email}|${clientNetwork(request)}`,
+      scope: `${limit.scope}:email`,
+      identity: email,
+      limit: limit.limit,
+      windowSeconds: limit.windowSeconds,
+      now: new Date(),
+    })
+    await enforceRateLimit({
+      db: env.DB,
+      scope: `${limit.scope}:network`,
+      identity: clientNetwork(request),
       limit: limit.limit,
       windowSeconds: limit.windowSeconds,
       now: new Date(),
@@ -326,7 +333,7 @@ export function createWorker(dependencies = {}) {
               name: session.user.name,
               emailVerified: session.user.emailVerified,
             } : null,
-          }), env)
+          }, { headers: { 'Cache-Control': 'private, no-store' } }), env)
         }
 
         if (pathname === '/v1/sites' || pathname.startsWith('/v1/sites/')) {

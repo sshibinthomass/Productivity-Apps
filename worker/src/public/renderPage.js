@@ -26,7 +26,7 @@ export function renderPublicPage({ document, site, origin }) {
     metaTag('og:title', title), metaTag('og:description', description), metaTag('og:url', canonical),
     socialImage ? metaTag('og:image', socialImage) : '',
   ].join('')
-  const bootstrap = `<script id="mini-site-bootstrap" type="application/json">${escapeJson(site)}</script>`
+  const bootstrap = `<template id="mini-site-bootstrap">${escapeJson(site)}</template>`
   const withoutTitle = document.replace(/<title[^>]*>[\s\S]*?<\/title>/i, '')
   if (/<\/head>/i.test(withoutTitle) && /<\/body>/i.test(withoutTitle)) {
     return withoutTitle.replace(/<\/head>/i, `${head}</head>`).replace(/<\/body>/i, `${bootstrap}</body>`)

@@ -70,8 +70,8 @@ where explicitly called out; do not delete Firebase yet.
    challenge reports the `app.shibinthomas.com` hostname.
 6. In GitHub Pages settings, add `app.shibinthomas.com` as the custom domain.
    For a Pages project and zone in the same Cloudflare account, confirm the
-   custom domain in the Pages UI so Cloudflare can create the required CNAME.
-   Otherwise, add the CNAME `app` pointing to `sshibinthomass.github.io` (do
+   custom domain in the Pages UI. Before GitHub Pages custom-domain verification,
+   create the Cloudflare DNS CNAME `app` pointing to `sshibinthomass.github.io` (do
    not append the repository name). Complete GitHub's custom-domain
    verification before enabling the domain and enforce HTTPS. Follow GitHub
    Pages' current DNS/verification UI if it requires an additional ownership
@@ -121,7 +121,7 @@ npm run deploy:worker
 ```
 
 `db:migrate:remote` must finish before `deploy:worker`; the Worker expects all
-three migrations under `worker/migrations`. Push the verified `main` branch to
+committed migrations under `worker/migrations`. Push the verified `main` branch to
 run both deployment workflows. The Worker workflow repeats the checks, migrates
 D1, and deploys the Worker. The Pages workflow builds with the public
 Turnstile site key and deploys GitHub Pages.
@@ -143,6 +143,10 @@ VITE_TURNSTILE_SITE_KEY=your-turnstile-site-key
 The local Worker sends auth, session, health, and `/v1/sites/*` requests to its
 API branch. It sends `/v1/public/*`, `/assets/*`, and `/<slug>` to the public
 branch; the local public mini-site URL is `http://localhost:8787/<slug>`.
+
+Each account is limited atomically in D1 to 100 stored images or 50 MiB of
+draft media. R2 objects are removed when D1 rejects an upload or cloned asset
+for exceeding that quota.
 Then run:
 
 ```powershell

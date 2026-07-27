@@ -1,5 +1,6 @@
 import { requireUser as requireAuthenticatedUser } from '../auth/session.js'
 import { ApiError } from '../http/errors.js'
+import { readBoundedJson } from '../http/body.js'
 import { parseSiteId } from './domain.js'
 import { createMiniSiteService } from './service.js'
 
@@ -51,28 +52,15 @@ export function requiresJsonSiteBody(request) {
 }
 
 async function readJson(request) {
-  const contentLength = Number(request.headers.get('Content-Length'))
-  if (Number.isFinite(contentLength) && contentLength > MAX_JSON_BYTES) {
-    throw new ApiError('request_too_large', 'JSON request bodies must not exceed 1 MiB.', 413)
-  }
-
-  const text = await request.text()
-  if (new TextEncoder().encode(text).byteLength > MAX_JSON_BYTES) {
-    throw new ApiError('request_too_large', 'JSON request bodies must not exceed 1 MiB.', 413)
-  }
-  if (!text.trim()) {
-    throw new ApiError('invalid_argument', 'Request body must contain a JSON object.', 400)
-  }
-
-  try {
-    return JSON.parse(text)
-  } catch {
-    throw new ApiError('invalid_argument', 'Request body must contain valid JSON.', 400)
-  }
+  return readBoundedJson(request, { maxBytes: MAX_JSON_BYTES, message: 'JSON request bodies must not exceed 1 MiB.' })
 }
 
 function siteResponse(site, status = 200) {
-  return Response.json({ site }, { status })
+  return Response.json({ site }, { status, headers: { 'Cache-Control': 'private, no-store' } })
+}
+
+function privateJson(value, status = 200) {
+  return Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } })
 }
 
 export function createSiteRoutes({ auth, store, assets, service = createMiniSiteService({ store, assets }), requireUser = requireAuthenticatedUser } = {}) {
@@ -110,7 +98,7 @@ export function createSiteRoutes({ auth, store, assets, service = createMiniSite
       if (pathname === '/v1/sites') {
         const user = await currentUser(request)
         if (request.method === 'GET') {
-          return Response.json({ sites: await store.list({ userId: user.id }), limit: 5 })
+          return privateJson({ sites: await store.list({ userId: user.id }), limit: 5 })
         }
         if (request.method === 'POST') {
           return siteResponse(await service.createMiniSite({ userId: user.id, data: await readJson(request) }), 201)
@@ -134,7 +122,7 @@ export function createSiteRoutes({ auth, store, assets, service = createMiniSite
       }
       if (!path.action && request.method === 'DELETE') {
         const body = await readJson(request)
-        return Response.json(await service.deleteMiniSite({
+        return privateJson(await service.deleteMiniSite({
           userId: user.id,
           data: { ...body, siteId: path.siteId },
         }))
@@ -155,14 +143,14 @@ export function createSiteRoutes({ auth, store, assets, service = createMiniSite
       }
       if (path.action === 'publish' && request.method === 'POST') {
         const body = await readJson(request)
-        return Response.json({ publication: await service.publishMiniSite({
+        return privateJson({ publication: await service.publishMiniSite({
           userId: user.id,
           data: { ...body, siteId: path.siteId },
         }) })
       }
       if (path.action === 'unpublish' && request.method === 'POST') {
         const body = await readJson(request)
-        return Response.json({ publication: await service.unpublishMiniSite({
+        return privateJson({ publication: await service.unpublishMiniSite({
           userId: user.id,
           data: { ...body, siteId: path.siteId },
         }) })
@@ -170,7 +158,7 @@ export function createSiteRoutes({ auth, store, assets, service = createMiniSite
       if (path.action === 'analytics' && request.method === 'GET') {
         const analytics = await store.getAnalytics({ userId: user.id, siteId: path.siteId })
         if (analytics?.code === 'not-found') return notFound()
-        return Response.json({ analytics })
+        return privateJson({ analytics })
       }
       return notFound()
     },

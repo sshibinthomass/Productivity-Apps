@@ -4,15 +4,8 @@ import {
   LINK_BLOCK_LIMIT,
   normalizeDraft,
 } from './miniSiteModel.js'
+import { isReservedMiniSiteSlug } from '../../../../shared/miniSiteRoutes.js'
 
-const RESERVED_SLUGS = new Set([
-  'admin',
-  'api',
-  'assets',
-  'login',
-  'mini-sites',
-  's',
-])
 const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){1,38}[a-z0-9]$/
 const ALLOWED_SCHEMES = new Set(['http:', 'https:', 'mailto:', 'tel:'])
 const ALLOWED_IMAGE_TYPES = new Set([
@@ -38,7 +31,7 @@ export function validateSlug(value) {
   const slug = String(value ?? '').trim()
   if (
     !SLUG_PATTERN.test(slug) ||
-    RESERVED_SLUGS.has(slug.toLowerCase()) ||
+    isReservedMiniSiteSlug(slug) ||
     slug !== slug.toLowerCase()
   ) {
     return {

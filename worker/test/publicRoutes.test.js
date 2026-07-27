@@ -46,7 +46,8 @@ describe('public mini-site routes', () => {
     expect(response.status).toBe(200)
     expect(html).toContain('<title>Maya &amp; Studio</title>')
     expect(html).not.toContain('<script>alert(1)</script>')
-    expect(html).toContain('id="mini-site-bootstrap"')
+    expect(html).toContain('<template id="mini-site-bootstrap">')
+    expect(html).not.toContain('<script id="mini-site-bootstrap"')
     expect(response.headers.get('Cache-Control')).toBe('public, max-age=60, stale-while-revalidate=300')
   })
 
@@ -141,6 +142,10 @@ describe('public mini-site routes', () => {
   })
 
   it('streams published R2 assets with their authoritative MIME type and nosniff', async () => {
+    await seedPublishedSite(env.DB, { blocks: [{
+      id: 'avatar', type: 'image', visible: true,
+      content: { url: 'https://links.shibinthomas.com/assets/private-site-id/3/avatar', alt: 'Avatar' },
+    }] })
     await env.MEDIA.put('public/private-site-id/3/avatar', new Uint8Array([137, 80, 78, 71]), {
       httpMetadata: { contentType: 'image/png', contentDisposition: 'inline; filename="avatar"' },
     })
@@ -151,5 +156,16 @@ describe('public mini-site routes', () => {
     expect(response.headers.get('Content-Type')).toBe('image/png')
     expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff')
     expect(response.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable')
+  })
+
+  it('does not expose orphaned or unreferenced public asset keys', async () => {
+    await seedPublishedSite(env.DB)
+    await env.MEDIA.put('public/private-site-id/3/orphan', new Uint8Array([137, 80, 78, 71]))
+    await env.MEDIA.put('public/private-site-id/4/wrong-revision', new Uint8Array([137, 80, 78, 71]))
+
+    for (const path of ['/assets/private-site-id/3/orphan', '/assets/private-site-id/4/wrong-revision']) {
+      const response = await worker.fetch(new Request(`${publicOrigin}${path}`), env, createExecutionContext())
+      expect(response.status).toBe(404)
+    }
   })
 })

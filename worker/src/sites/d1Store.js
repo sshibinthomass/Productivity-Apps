@@ -17,6 +17,10 @@ function asDraft(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     publishedAt: row.published_at,
+    analytics: {
+      totalViews: Number(row.analytics_views ?? 0),
+      totalClicks: Number(row.analytics_clicks ?? 0),
+    },
   }
 }
 
@@ -88,8 +92,9 @@ export function createD1Store({ db } = {}) {
   return {
     async list({ userId }) {
       const { results } = await db.prepare(`
-        SELECT *
-        FROM mini_sites
+        SELECT mini_sites.*, COALESCE(analytics_summary.view_count, 0) AS analytics_views,
+          COALESCE(analytics_summary.click_count, 0) AS analytics_clicks
+        FROM mini_sites LEFT JOIN analytics_summary ON analytics_summary.site_id = mini_sites.id
         WHERE owner_id = ?1
         ORDER BY updated_at DESC, id ASC
       `).bind(userId).all()

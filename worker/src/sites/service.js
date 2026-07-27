@@ -43,7 +43,16 @@ export function createMiniSiteService({ store, assets, createId = () => crypto.r
       userId = requireUserId(userId); const sourceSiteId = parseSiteId(data?.sourceSiteId); const input = parseCreateInput(data)
       const source = await store.get({ userId, siteId: sourceSiteId }); if (!source) throwStoreError({ code: 'not-found' })
       const timestamp = now(); const draft = { ...structuredClone(source), siteId: createId(), name: input.name, slug: input.slug, templateId: source.templateId, status: 'draft', draftRevision: 0, publishedRevision: 0, createdAt: timestamp, updatedAt: timestamp, publishedAt: null }
-      return throwStoreError(await store.duplicate({ userId, sourceSiteId, draft }))
+      const duplicate = throwStoreError(await store.duplicate({ userId, sourceSiteId, draft }))
+      if (!assets?.cloneReferenced) return duplicate
+      try {
+        const cloned = await assets.cloneReferenced({ userId, sourceSiteId, targetSiteId: duplicate.siteId, draft: duplicate })
+        return throwStoreError(await store.saveDraft({ userId, siteId: duplicate.siteId, draft: cloned.draft, expectedRevision: duplicate.draftRevision }))
+      } catch (error) {
+        const deletion = await store.delete({ userId, siteId: duplicate.siteId, confirmationName: duplicate.name }).catch(() => null)
+        if (deletion?.assetKeys?.length) await assets.deleteSiteAssets({ siteId: duplicate.siteId, assetKeys: deletion.assetKeys }).catch(() => {})
+        throw error
+      }
     },
     async saveMiniSiteDraft({ userId, data }) {
       userId = requireUserId(userId); const siteId = parseSiteId(data?.siteId); const expectedRevision = data?.expectedRevision

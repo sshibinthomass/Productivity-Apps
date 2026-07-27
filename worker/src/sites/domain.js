@@ -1,7 +1,7 @@
 import { ApiError } from '../http/errors.js'
+import { isReservedMiniSiteSlug } from '../../../shared/miniSiteRoutes.js'
 
 const SITE_TEMPLATES = new Set(['creator', 'portfolio', 'minimal', 'bold', 'blank'])
-const RESERVED_SLUGS = new Set(['admin', 'api', 'assets', 'login', 'mini-sites', 's'])
 const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){1,38}[a-z0-9]$/
 const BLOCK_CONTENT_KEYS = {
   profile: ['avatarUrl', 'avatarStoragePath', 'displayName', 'bio', 'alt'],
@@ -60,7 +60,7 @@ function createTemplatePreset(templateId, name) {
 
 export function parseSlug(value) {
   const slug = typeof value === 'string' ? value.trim() : ''
-  if (!SLUG_PATTERN.test(slug) || slug !== slug.toLowerCase() || RESERVED_SLUGS.has(slug)) throw siteError('invalid-argument', 'Use a valid lowercase public slug.')
+  if (!SLUG_PATTERN.test(slug) || slug !== slug.toLowerCase() || isReservedMiniSiteSlug(slug)) throw siteError('invalid-argument', 'Use a valid lowercase public slug.')
   return slug
 }
 

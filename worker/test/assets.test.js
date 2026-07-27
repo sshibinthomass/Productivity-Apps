@@ -65,6 +65,31 @@ describe('R2 mini-site assets', () => {
     await expect(assets.uploadDraft({ userId: 'owner-1', siteId: 'site-1', file: file(new Uint8Array(5 * 1024 * 1024 + 1)) })).rejects.toMatchObject({ code: 'invalid_asset' })
   })
 
+  it('rejects the 101st asset and compensates its just-written R2 object', async () => {
+    for (let index = 0; index < 100; index += 1) {
+      await env.DB.prepare('INSERT INTO site_assets (id, site_id, owner_id, object_key, content_type, size_bytes) VALUES (?1, ?2, ?3, ?4, ?5, ?6)')
+        .bind(`existing-${index}`, 'site-1', 'owner-1', `drafts/owner-1/site-1/existing-${index}`, 'image/png', 1).run()
+    }
+    await expect(assets.uploadDraft({ userId: 'owner-1', siteId: 'site-1', file: file() })).rejects.toMatchObject({ code: 'asset_quota_exceeded', status: 413 })
+    await expect(env.MEDIA.get('drafts/owner-1/site-1/asset-1')).resolves.toBeNull()
+  })
+
+  it('rejects media exceeding the 50 MiB account quota', async () => {
+    await env.DB.prepare('INSERT INTO site_assets (id, site_id, owner_id, object_key, content_type, size_bytes) VALUES (?1, ?2, ?3, ?4, ?5, ?6)')
+      .bind('existing-large', 'site-1', 'owner-1', 'drafts/owner-1/site-1/existing-large', 'image/png', 50 * 1024 * 1024).run()
+    await expect(assets.uploadDraft({ userId: 'owner-1', siteId: 'site-1', file: file() })).rejects.toMatchObject({ code: 'asset_quota_exceeded', status: 413 })
+    await expect(env.MEDIA.get('drafts/owner-1/site-1/asset-1')).resolves.toBeNull()
+  })
+
+  it('keeps concurrent uploads within the atomic owner asset limit', async () => {
+    const results = await Promise.allSettled(Array.from({ length: 101 }, () => (
+      assets.uploadDraft({ userId: 'owner-1', siteId: 'site-1', file: file() })
+    )))
+    expect(results.filter(({ status }) => status === 'fulfilled')).toHaveLength(100)
+    expect(results.filter(({ status, reason }) => status === 'rejected' && reason.code === 'asset_quota_exceeded')).toHaveLength(1)
+    await expect(env.DB.prepare("SELECT COUNT(*) AS count FROM site_assets WHERE owner_id = 'owner-1'").first()).resolves.toEqual({ count: 100 })
+  })
+
   it.each([
     ['image/png', png], ['image/jpeg', realJpeg], ['image/gif', gif], ['image/webp', webp],
   ])('accepts the %s signature only when it matches the declared MIME type', async (type, bytes) => {
@@ -84,6 +109,30 @@ describe('R2 mini-site assets', () => {
     await expect(localAssets.uploadDraft({ userId: 'owner-1', siteId: 'site-1', file: file() })).resolves.toMatchObject({
       url: 'http://127.0.0.1:8787/v1/sites/site-1/assets/local-asset',
     })
+  })
+
+  it('clones referenced media so the duplicate can publish after its source is deleted', async () => {
+    await insertSite({ id: 'site-copy', ownerId: 'owner-1' })
+    const uploaded = await assets.uploadDraft({ userId: 'owner-1', siteId: 'site-1', file: file() })
+    const sourceDraft = {
+      siteId: 'site-1', name: 'Maya', slug: 'site-1-page', templateId: 'blank', draftRevision: 1,
+      blocks: [{ id: 'image', type: 'image', visible: true, content: { storagePath: uploaded.storagePath, url: '', alt: 'Image' } }],
+      theme: {}, seo: { socialImagePath: null },
+    }
+    const cloned = await assets.cloneReferenced({ userId: 'owner-1', sourceSiteId: 'site-1', targetSiteId: 'site-copy', draft: sourceDraft })
+    const clonedPath = cloned.draft.blocks[0].content.storagePath
+    expect(clonedPath).toMatch(/^drafts\/owner-1\/site-copy\//)
+
+    await env.DB.prepare('DELETE FROM site_assets WHERE site_id = ?1').bind('site-1').run()
+    await env.MEDIA.delete(uploaded.storagePath)
+    const promoted = await assets.promoteReferenced({
+      userId: 'owner-1', siteId: 'site-copy',
+      draft: { ...cloned.draft, siteId: 'site-copy', slug: 'site-copy-page', draftRevision: 1 },
+      attemptId: 'copy-publish',
+    })
+
+    expect(promoted.draft.blocks[0].content.url).toBe('https://links.shibinthomas.com/assets/site-copy/1/asset-2')
+    await expect(env.MEDIA.get('public/site-copy/1/asset-2')).resolves.toBeTruthy()
   })
 
   it('rejects a PNG label with non-PNG bytes', async () => {
@@ -344,4 +393,23 @@ describe('R2 mini-site assets', () => {
 
     expect(calls).toEqual(['public/', 'staging/'])
   })
+
+  it('removes an aged draft object with no D1 asset reference', async () => {
+    const deleted = []
+    const bucket = {
+      async list({ prefix }) {
+        expect(prefix).toBe('drafts/')
+        return { objects: [{ key: 'drafts/owner-1/site-1/orphan', uploaded: new Date('2026-01-01T00:00:00.000Z') }], truncated: false }
+      },
+      async delete(key) { deleted.push(key) },
+    }
+    await env.DB.prepare(`INSERT INTO maintenance_cursors (name, phase, cursor, updated_at)
+      VALUES ('public_asset_cleanup_scheduler', 'draft', NULL, '2026-01-01T00:00:00.000Z')`).run()
+    const cleanup = createAssetService({ bucket, db: env.DB, publicOrigin: 'https://links.shibinthomas.com' })
+
+    await cleanup.cleanupObsoletePublicAssets({ now: new Date('2026-02-01T00:00:00.000Z'), graceMilliseconds: 0, deleteBudget: 1 })
+
+    expect(deleted).toEqual(['drafts/owner-1/site-1/orphan'])
+  })
+
 })

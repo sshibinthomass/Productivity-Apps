@@ -8,8 +8,12 @@ on:
       - 'worker/**'
       - 'wrangler.jsonc'
       - 'src/**'
+      - 'public/**'
+      - 'index.html'
+      - 'build/**'
       - 'package*.json'
       - 'vite.config.js'
+      - '.github/workflows/deploy-worker.yml'
   workflow_dispatch:
 
 permissions:

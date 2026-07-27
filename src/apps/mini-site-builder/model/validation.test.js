@@ -16,7 +16,7 @@ describe('slug validation', () => {
     expect(normalizeSlug('  Maya & Studio 2026  ')).toBe('maya-studio-2026')
   })
 
-  it.each(['ab', '-maya', 'maya-', 'maya--studio', 'mini-sites', 'ADMIN'])(
+  it.each(['ab', '-maya', 'maya-', 'maya--studio', 'mini-sites', 'verify-email', 'forgot-password', 'reset-password', 'ADMIN'])(
     'rejects an unavailable slug shape or reserved word: %s',
     (slug) => {
       expect(validateSlug(slug).valid).toBe(false)
