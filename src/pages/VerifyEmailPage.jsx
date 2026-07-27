@@ -24,10 +24,14 @@ export default function VerifyEmailPage() {
   const mountedRef = useRef(true)
   const attemptRef = useRef(0)
 
-  useEffect(() => () => {
-    mountedRef.current = false
-    attemptRef.current += 1
-    if (timerRef.current) window.clearInterval(timerRef.current)
+  useEffect(() => {
+    mountedRef.current = true
+
+    return () => {
+      mountedRef.current = false
+      attemptRef.current += 1
+      if (timerRef.current) window.clearInterval(timerRef.current)
+    }
   }, [])
 
   async function resend(event) {
