@@ -4,7 +4,7 @@ Arvenilo Network is a directory of focused React productivity applications built
 with the Precision Spatial design system. The Mini-Site Builder lets signed-in
 users create up to five public profile and link pages from a template or a blank
 canvas, manage modular blocks, publish to a unique slug, and review private
-analytics. Published sites are publicly readable at `https://links.shibinthomas.com/s/<slug>`.
+analytics. Published sites are publicly readable at `https://links.shibinthomas.com/<slug>`.
 
 Mini-site accounts use email and password authentication. Creating, editing,
 publishing, deleting, uploading media, and viewing analytics require a signed-in
@@ -73,6 +73,9 @@ layer only. The Worker independently enforces account ownership, the five-site
 limit, publishing, analytics, and media access.
 
 ## Deployment
+
+The complete release, DNS, secret-management, recovery, privacy, and smoke-test
+procedure is in [the Cloudflare production runbook](docs/cloudflare-deployment.md).
 
 ### Cloudflare production prerequisites
 
