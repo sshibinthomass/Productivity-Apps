@@ -1,5 +1,5 @@
 import { createExecutionContext, env } from 'cloudflare:test'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createAuth } from '../src/auth/createAuth.js'
 import { getSession, requireUser } from '../src/auth/session.js'
 import { createWorker } from '../src/index.js'
@@ -47,6 +47,8 @@ describe('Better Auth email sessions', () => {
   let emailSender
 
   beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-07-27T15:22:00.000Z'))
     await resetDatabase(env.DB, env.TEST_MIGRATIONS)
     deliveries = []
     resetDeliveries = []
@@ -65,6 +67,10 @@ describe('Better Auth email sessions', () => {
       email: emailSender,
       verifyTurnstile: officialTurnstileTestValidator,
     })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('registers with consent, requires verification, creates a cross-subdomain session, and signs out', async () => {
@@ -194,28 +200,21 @@ describe('Better Auth email sessions', () => {
   })
 
   it('enforces the sign-up route limit before the sixth attempt', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] })
-    vi.setSystemTime(new Date('2026-07-27T15:22:00.000Z'))
-
-    try {
-      for (let attempt = 0; attempt < 5; attempt += 1) {
-        await worker.fetch(
-          accountRequest('/auth/sign-up/email', { name: 'Person', email, password }),
-          env,
-          createExecutionContext(),
-        )
-      }
-
-      const response = await worker.fetch(
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await worker.fetch(
         accountRequest('/auth/sign-up/email', { name: 'Person', email, password }),
         env,
         createExecutionContext(),
       )
-
-      expect(response.status).toBe(429)
-    } finally {
-      vi.useRealTimers()
     }
+
+    const response = await worker.fetch(
+      accountRequest('/auth/sign-up/email', { name: 'Person', email, password }),
+      env,
+      createExecutionContext(),
+    )
+
+    expect(response.status).toBe(429)
   })
 
   it('cannot bypass a per-email sign-up limit by rotating networks', async () => {
