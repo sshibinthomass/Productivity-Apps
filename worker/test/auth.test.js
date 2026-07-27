@@ -377,6 +377,62 @@ describe('Better Auth email sessions', () => {
     expect(newPassword.headers.get('Set-Cookie')).toContain('HttpOnly')
   })
 
+  it('changes a signed-in password without exposing session internals', async () => {
+    await worker.fetch(
+      accountRequest('/auth/sign-up/email', { name: 'Person', email, password }),
+      env,
+      createExecutionContext(),
+    )
+    await worker.fetch(
+      new Request(deliveries[0].url, { headers: { Origin: appOrigin } }),
+      env,
+      createExecutionContext(),
+    )
+    const signedIn = await worker.fetch(
+      accountRequest('/auth/sign-in/email', { email, password }),
+      env,
+      createExecutionContext(),
+    )
+    const signedInCookie = cookieFrom(signedIn)
+
+    const signedOutChange = await worker.fetch(
+      accountRequest('/auth/change-password', {
+        currentPassword: password,
+        newPassword: replacementPassword,
+      }),
+      env,
+      createExecutionContext(),
+    )
+    expect(signedOutChange.status).toBe(401)
+
+    const changed = await worker.fetch(
+      accountRequest('/auth/change-password', {
+        currentPassword: password,
+        newPassword: replacementPassword,
+      }, { cookie: signedInCookie }),
+      env,
+      createExecutionContext(),
+    )
+    expect(changed.status).toBe(200)
+    const changedBody = await changed.json()
+    expect(changedBody).toEqual({ status: true })
+    expect(JSON.stringify(changedBody)).not.toMatch(/token|session|account/i)
+
+    const oldPassword = await worker.fetch(
+      accountRequest('/auth/sign-in/email', { email, password }),
+      env,
+      createExecutionContext(),
+    )
+    expect(oldPassword.status).toBe(401)
+
+    const newPassword = await worker.fetch(
+      accountRequest('/auth/sign-in/email', { email, password: replacementPassword }),
+      env,
+      createExecutionContext(),
+    )
+    expect(newPassword.status).toBe(200)
+  })
+
   it('does not expose Better Auth session introspection routes', async () => {
     const responses = await Promise.all(['/auth/get-session', '/auth/list-sessions'].map((path) => (
       worker.fetch(

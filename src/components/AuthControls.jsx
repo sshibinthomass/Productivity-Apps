@@ -26,7 +26,7 @@ export default function AuthControls() {
     return (
       <div className="auth-controls">
         <Link className="auth-link" to="/login">
-          Sign in with Google
+          Sign in
         </Link>
         {visibleError && (
           <span className="auth-controls__error" role="alert">
@@ -37,7 +37,7 @@ export default function AuthControls() {
     )
   }
 
-  const identity = user.displayName || user.email || 'Google account'
+  const identity = user.displayName || user.email || 'Account'
 
   async function handleSignOut() {
     setIsSigningOut(true)
@@ -47,7 +47,7 @@ export default function AuthControls() {
       const didSignOut = await signOutUser()
 
       if (!didSignOut) {
-        setSignOutError('Google could not sign you out. Please try again.')
+        setSignOutError('We could not sign you out. Please try again.')
       }
     } finally {
       setIsSigningOut(false)

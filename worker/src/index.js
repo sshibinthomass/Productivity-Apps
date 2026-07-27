@@ -26,6 +26,7 @@ const publicAuthRoutes = new Map([
   ['POST /auth/send-verification-email', 'resend-verification'],
   ['POST /auth/request-password-reset', 'password-reset-request'],
   ['POST /auth/reset-password', 'reset-password'],
+  ['POST /auth/change-password', 'change-password'],
   ['POST /auth/sign-out', 'sign-out'],
   ['GET /auth/verify-email', 'verify-email'],
 ])
@@ -121,6 +122,9 @@ async function sanitizeAuthResponse(response, route) {
     case 'password-reset-request':
     case 'reset-password':
       safeBody = { status: body.status === true }
+      break
+    case 'change-password':
+      safeBody = { status: true }
       break
     case 'verify-email':
       safeBody = { status: body.status === true, user: publicUser(body.user) }

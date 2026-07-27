@@ -9,7 +9,13 @@ const signedOutAuth = {
   user: null,
   isAuthLoading: false,
   authError: null,
-  signInWithGoogle: vi.fn(),
+  signInWithEmail: vi.fn(),
+  registerWithEmail: vi.fn(),
+  resendVerification: vi.fn(),
+  requestPasswordReset: vi.fn(),
+  resetPassword: vi.fn(),
+  changePassword: vi.fn(),
+  refreshSession: vi.fn(),
   signOutUser: vi.fn(),
 }
 

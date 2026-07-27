@@ -1,43 +1,29 @@
 import { useState } from 'react'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { AuthProvider } from './AuthContext.jsx'
 import { useAuth } from './authContext.js'
 
-function createClient(overrides = {}) {
-  let onUser
-  let onError
-  const unsubscribe = vi.fn()
-  const client = {
-    configurationError: null,
-    observeAuthState(userObserver, errorObserver) {
-      onUser = userObserver
-      onError = errorObserver
-      return unsubscribe
-    },
-    async signInWithGoogle() {
-      return {
-        user: {
-          uid: 'user-1',
-          displayName: 'Ada',
-          email: 'ada@example.com',
-          photoURL: null,
-        },
-      }
-    },
-    async signOutUser() {},
-    ...overrides,
-  }
+const verifiedUser = {
+  uid: 'user-1',
+  displayName: 'Ada Lovelace',
+  email: 'ada@example.com',
+  photoURL: null,
+  emailVerified: true,
+}
 
+function createClient(overrides = {}) {
   return {
-    client,
-    emitUser(user) {
-      onUser(user)
-    },
-    emitError(error) {
-      onError(error)
-    },
-    unsubscribe,
+    configurationError: null,
+    getSession: vi.fn().mockResolvedValue({ user: verifiedUser }),
+    signInEmail: vi.fn().mockResolvedValue({ user: verifiedUser }),
+    registerEmail: vi.fn(),
+    resendVerification: vi.fn(),
+    requestPasswordReset: vi.fn(),
+    resetPassword: vi.fn(),
+    changePassword: vi.fn(),
+    signOut: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
   }
 }
 
@@ -46,7 +32,8 @@ function AuthHarness() {
     user,
     isAuthLoading,
     authError,
-    signInWithGoogle,
+    signInWithEmail,
+    refreshSession,
     signOutUser,
   } = useAuth()
   const [actionResult, setActionResult] = useState('')
@@ -60,11 +47,24 @@ function AuthHarness() {
       <button
         type="button"
         onClick={async () => {
-          const signedInUser = await signInWithGoogle()
+          const signedInUser = await signInWithEmail({
+            email: 'ada@example.com',
+            password: 'long-password',
+            turnstileToken: 'turnstile-token',
+          })
           setActionResult(signedInUser?.email ?? 'sign-in-failed')
         }}
       >
         Sign in
+      </button>
+      <button
+        type="button"
+        onClick={async () => {
+          const currentUser = await refreshSession()
+          setActionResult(currentUser?.email ?? 'session-expired')
+        }}
+      >
+        Refresh session
       </button>
       <button
         type="button"
@@ -80,24 +80,15 @@ function AuthHarness() {
 }
 
 describe('AuthProvider', () => {
-  it('waits for Firebase before exposing the restored user', async () => {
-    const fake = createClient()
+  it('restores the existing email session before exposing the user', async () => {
+    const client = createClient()
     render(
-      <AuthProvider client={fake.client}>
+      <AuthProvider client={client}>
         <AuthHarness />
       </AuthProvider>,
     )
 
     expect(screen.getByRole('status').textContent).toBe('loading')
-
-    act(() => {
-      fake.emitUser({
-        uid: 'user-1',
-        displayName: 'Ada',
-        email: 'ada@example.com',
-        photoURL: null,
-      })
-    })
 
     await waitFor(() => {
       expect(screen.getByRole('status').textContent).toBe('ready')
@@ -105,10 +96,10 @@ describe('AuthProvider', () => {
     })
   })
 
-  it('returns the Google user after successful sign-in', async () => {
-    const fake = createClient()
+  it('returns the normalized user after successful email sign-in', async () => {
+    const client = createClient({ getSession: vi.fn().mockResolvedValue({ user: null }) })
     render(
-      <AuthProvider client={fake.client}>
+      <AuthProvider client={client}>
         <AuthHarness />
       </AuthProvider>,
     )
@@ -116,20 +107,22 @@ describe('AuthProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
 
     await waitFor(() => {
-      expect(screen.getByTestId('action-result').textContent).toBe(
-        'ada@example.com',
-      )
+      expect(screen.getByTestId('action-result').textContent).toBe('ada@example.com')
+      expect(client.signInEmail).toHaveBeenCalledWith({
+        email: 'ada@example.com',
+        password: 'long-password',
+        turnstileToken: 'turnstile-token',
+      })
     })
   })
 
-  it('shows a recoverable error when Google sign-in fails', async () => {
-    const fake = createClient({
-      signInWithGoogle: async () => {
-        throw { code: 'auth/popup-blocked' }
-      },
+  it('shows an email-password error for invalid credentials', async () => {
+    const client = createClient({
+      getSession: vi.fn().mockResolvedValue({ user: null }),
+      signInEmail: vi.fn().mockRejectedValue({ code: 'INVALID_EMAIL_OR_PASSWORD' }),
     })
     render(
-      <AuthProvider client={fake.client}>
+      <AuthProvider client={client}>
         <AuthHarness />
       </AuthProvider>,
     )
@@ -137,109 +130,103 @@ describe('AuthProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
 
     await waitFor(() => {
-      expect(screen.getByRole('alert').textContent).toContain('allow pop-ups')
-      expect(screen.getByTestId('action-result').textContent).toBe(
-        'sign-in-failed',
-      )
+      expect(screen.getByRole('alert').textContent).toContain('Incorrect email or password')
+      expect(screen.getByTestId('action-result').textContent).toBe('sign-in-failed')
     })
   })
 
-  it('reports successful sign-out to consumers', async () => {
-    const fake = createClient()
+  it('requires email verification before treating a sign-in as authenticated', async () => {
+    const client = createClient({
+      getSession: vi.fn().mockResolvedValue({ user: null }),
+      signInEmail: vi.fn().mockResolvedValue({
+        user: { ...verifiedUser, emailVerified: false },
+      }),
+    })
     render(
-      <AuthProvider client={fake.client}>
+      <AuthProvider client={client}>
         <AuthHarness />
       </AuthProvider>,
     )
 
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toContain('Verify your email')
+      expect(screen.getByTestId('user').textContent).toBe('signed-out')
+    })
+  })
+
+  it('clears the user after successful sign-out', async () => {
+    const client = createClient()
+    render(
+      <AuthProvider client={client}>
+        <AuthHarness />
+      </AuthProvider>,
+    )
+
+    await screen.findByText('ada@example.com')
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
 
     await waitFor(() => {
       expect(screen.getByTestId('action-result').textContent).toBe('signed-out')
+      expect(screen.getByTestId('user').textContent).toBe('signed-out')
     })
   })
 
-  it('uses a sign-out-specific message when sign-out fails', async () => {
-    const fake = createClient({
-      signOutUser: async () => {
-        throw { code: 'auth/network-request-failed' }
-      },
-    })
+  it('clears a stale user when the session expires', async () => {
+    const client = createClient()
     render(
-      <AuthProvider client={fake.client}>
+      <AuthProvider client={client}>
         <AuthHarness />
       </AuthProvider>,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+    await screen.findByText('ada@example.com')
+    client.getSession.mockResolvedValueOnce({ user: null })
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh session' }))
 
     await waitFor(() => {
-      expect(screen.getByRole('alert').textContent).toContain(
-        'signing you out',
-      )
-      expect(screen.getByTestId('action-result').textContent).toBe(
-        'sign-out-failed',
-      )
+      expect(screen.getByTestId('action-result').textContent).toBe('session-expired')
+      expect(screen.getByTestId('user').textContent).toBe('signed-out')
     })
   })
 
-  it('retains unexpected Firebase errors in development diagnostics', async () => {
-    const originalError = new Error('Unexpected provider failure')
-    const consoleError = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {})
-    const fake = createClient({
-      signInWithGoogle: async () => {
-        throw originalError
-      },
+  it('exposes configuration failure without requesting a session', () => {
+    const getSession = vi.fn()
+    const client = createClient({
+      configurationError: 'Email and password sign-in is not configured.',
+      getSession,
     })
     render(
-      <AuthProvider client={fake.client}>
-        <AuthHarness />
-      </AuthProvider>,
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
-
-    await waitFor(() => {
-      expect(consoleError).toHaveBeenCalledWith(
-        'Unexpected Firebase authentication error.',
-        originalError,
-      )
-    })
-
-    consoleError.mockRestore()
-  })
-
-  it('unsubscribes from Firebase when the provider unmounts', () => {
-    const fake = createClient()
-    const view = render(
-      <AuthProvider client={fake.client}>
-        <AuthHarness />
-      </AuthProvider>,
-    )
-
-    view.unmount()
-
-    expect(fake.unsubscribe).toHaveBeenCalledOnce()
-  })
-
-  it('exposes configuration failure without starting auth observation', () => {
-    const observeAuthState = vi.fn()
-    const fake = createClient({
-      configurationError: 'Firebase sign-in is not configured.',
-      observeAuthState,
-    })
-
-    render(
-      <AuthProvider client={fake.client}>
+      <AuthProvider client={client}>
         <AuthHarness />
       </AuthProvider>,
     )
 
     expect(screen.getByRole('status').textContent).toBe('ready')
     expect(screen.getByRole('alert').textContent).toContain('not configured')
-    expect(observeAuthState).not.toHaveBeenCalled()
+    expect(getSession).not.toHaveBeenCalled()
+  })
+
+  it('does not update state when a session request completes after unmount', async () => {
+    let resolveSession
+    const getSession = vi.fn(() => new Promise((resolve) => {
+      resolveSession = resolve
+    }))
+    const client = createClient({ getSession })
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const view = render(
+      <AuthProvider client={client}>
+        <AuthHarness />
+      </AuthProvider>,
+    )
+
+    view.unmount()
+    resolveSession({ user: verifiedUser })
+    await Promise.resolve()
+
+    expect(consoleError).not.toHaveBeenCalled()
+    consoleError.mockRestore()
   })
 
   it('requires consumers to render inside the provider', () => {
