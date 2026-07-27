@@ -194,21 +194,28 @@ describe('Better Auth email sessions', () => {
   })
 
   it('enforces the sign-up route limit before the sixth attempt', async () => {
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      await worker.fetch(
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-07-27T15:22:00.000Z'))
+
+    try {
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        await worker.fetch(
+          accountRequest('/auth/sign-up/email', { name: 'Person', email, password }),
+          env,
+          createExecutionContext(),
+        )
+      }
+
+      const response = await worker.fetch(
         accountRequest('/auth/sign-up/email', { name: 'Person', email, password }),
         env,
         createExecutionContext(),
       )
+
+      expect(response.status).toBe(429)
+    } finally {
+      vi.useRealTimers()
     }
-
-    const response = await worker.fetch(
-      accountRequest('/auth/sign-up/email', { name: 'Person', email, password }),
-      env,
-      createExecutionContext(),
-    )
-
-    expect(response.status).toBe(429)
   })
 
   it('cannot bypass a per-email sign-up limit by rotating networks', async () => {
