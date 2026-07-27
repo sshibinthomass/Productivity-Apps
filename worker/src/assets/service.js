@@ -222,26 +222,41 @@ export function createAssetService({ bucket, db, publicOrigin, createId = () => 
 
   async function cleanupObsoletePublicAssets({ now = new Date(), graceMilliseconds = 7 * 24 * 60 * 60 * 1000, pageSize = 25, deleteBudget = 25 } = {}) {
     const cutoff = new Date(now.getTime() - graceMilliseconds)
-    const state = await db.prepare("SELECT phase, cursor FROM maintenance_cursors WHERE name = 'public_asset_cleanup'").first() ?? { phase: 'public', cursor: null }
-    const prefix = state.phase === 'staging' ? 'staging/' : 'public/'
-    const page = await bucket.list({ prefix, ...(state.cursor ? { cursor: state.cursor } : {}), limit: Math.min(pageSize, deleteBudget) })
+    const budget = Math.max(0, Math.floor(deleteBudget))
+    if (budget === 1) {
+      const scheduler = await db.prepare("SELECT phase FROM maintenance_cursors WHERE name = 'public_asset_cleanup_scheduler'").first()
+      const publicObject = scheduler?.phase !== 'staging'
+      await cleanupPrefix({
+        name: publicObject ? 'public_asset_cleanup_public' : 'public_asset_cleanup_staging',
+        prefix: publicObject ? 'public/' : 'staging/', budget, pageSize, cutoff, now, publicObject,
+      })
+      await db.prepare(`INSERT INTO maintenance_cursors (name, phase, cursor, updated_at) VALUES ('public_asset_cleanup_scheduler', ?1, NULL, ?2)
+        ON CONFLICT(name) DO UPDATE SET phase = excluded.phase, cursor = NULL, updated_at = excluded.updated_at`)
+        .bind(publicObject ? 'staging' : 'public', now.toISOString()).run()
+      return
+    }
+    const publicBudget = Math.ceil(budget / 2); const stagingBudget = budget - publicBudget
+    await cleanupPrefix({ name: 'public_asset_cleanup_public', prefix: 'public/', budget: publicBudget, pageSize, cutoff, now, publicObject: true })
+    await cleanupPrefix({ name: 'public_asset_cleanup_staging', prefix: 'staging/', budget: stagingBudget, pageSize, cutoff, now, publicObject: false })
+  }
+
+  async function cleanupPrefix({ name, prefix, budget, pageSize, cutoff, now, publicObject }) {
+    if (budget < 1) return
+    const state = await db.prepare('SELECT cursor FROM maintenance_cursors WHERE name = ?1').bind(name).first()
+    const page = await bucket.list({ prefix, ...(state?.cursor ? { cursor: state.cursor } : {}), limit: Math.min(pageSize, budget) })
     let deleted = 0
     for (const object of page.objects) {
-      if (deleted >= deleteBudget || !(object.uploaded instanceof Date) || object.uploaded >= cutoff) continue
-      let eligible = prefix === 'staging/'
-      if (!eligible) {
+      if (deleted >= budget || !(object.uploaded instanceof Date) || object.uploaded >= cutoff) continue
+      let eligible = true
+      if (publicObject) {
         await beforePublicDelete?.(object.key)
         eligible = await obsoletePublicRevision(object.key)
       }
-      if (eligible) {
-        await bucket.delete(object.key)
-        deleted += 1
-      }
+      if (eligible) { await bucket.delete(object.key); deleted += 1 }
     }
-    const next = page.truncated ? { phase: state.phase, cursor: page.cursor } : state.phase === 'public' ? { phase: 'staging', cursor: null } : null
-    if (next) await db.prepare(`INSERT INTO maintenance_cursors (name, phase, cursor, updated_at) VALUES ('public_asset_cleanup', ?1, ?2, ?3)
-      ON CONFLICT(name) DO UPDATE SET phase = excluded.phase, cursor = excluded.cursor, updated_at = excluded.updated_at`).bind(next.phase, next.cursor, now.toISOString()).run()
-    else await db.prepare("DELETE FROM maintenance_cursors WHERE name = 'public_asset_cleanup'").run()
+    if (page.truncated) await db.prepare(`INSERT INTO maintenance_cursors (name, phase, cursor, updated_at) VALUES (?1, ?2, ?3, ?4)
+      ON CONFLICT(name) DO UPDATE SET cursor = excluded.cursor, updated_at = excluded.updated_at`).bind(name, publicObject ? 'public' : 'staging', page.cursor, now.toISOString()).run()
+    else await db.prepare('DELETE FROM maintenance_cursors WHERE name = ?1').bind(name).run()
   }
 
   async function obsoletePublicRevision(key) {

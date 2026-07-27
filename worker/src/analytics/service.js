@@ -21,16 +21,23 @@ async function hash(value) {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
+async function hmac(value, key) {
+  const encoder = new TextEncoder()
+  const cryptoKey = await crypto.subtle.importKey('raw', encoder.encode(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  const signature = await crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(value))
+  return [...new Uint8Array(signature)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
 async function receiptId({ siteId, revision, type, eventId, blockId }) {
   return hash(JSON.stringify([siteId, revision, type, eventId, blockId ?? null]))
 }
 
-async function enforceEventRateLimit({ db, slug, network, now }) {
+async function enforceEventRateLimit({ db, siteId, network, now, rateLimitKey }) {
   const timestamp = asDate(now)
   const windowMs = EVENT_WINDOW_SECONDS * 1000
   const startedAt = new Date(Math.floor(timestamp.getTime() / windowMs) * windowMs).toISOString()
   const expiresAt = new Date(new Date(startedAt).getTime() + windowMs).toISOString()
-  const key = await hash(JSON.stringify([slug, String(network || 'unknown')]))
+  const key = await hmac(JSON.stringify([siteId, String(network || 'unknown')]), rateLimitKey)
   const row = await db.prepare(`INSERT INTO public_event_rate_limits (key_hash, window_started_at, attempt_count, expires_at)
     VALUES (?1, ?2, 1, ?3)
     ON CONFLICT(key_hash) DO UPDATE SET window_started_at = excluded.window_started_at,
@@ -40,8 +47,9 @@ async function enforceEventRateLimit({ db, slug, network, now }) {
   if (row.attempt_count > EVENT_LIMIT) throw new ApiError('rate_limited', 'Too many events. Try again shortly.', 429)
 }
 
-export function createAnalyticsService({ db, now = () => new Date(), beforePersist } = {}) {
+export function createAnalyticsService({ db, now = () => new Date(), beforePersist, rateLimitKey } = {}) {
   if (!db) throw new TypeError('A D1 database is required.')
+  if (typeof rateLimitKey !== 'string' || !rateLimitKey) throw new TypeError('A public event rate-limit key is required.')
   return {
     async record({ slug, data, network }) {
       const input = parseEventInput({ ...data, slug })
@@ -50,7 +58,7 @@ export function createAnalyticsService({ db, now = () => new Date(), beforePersi
       if (!published) throw new ApiError('not_found', 'Not found.', 404)
       if (input.type === 'link_click' && !isClickTarget(JSON.parse(published.snapshot_json), input.blockId)) throw new ApiError('invalid_argument', 'That link is not part of the published site.', 400)
       const occurred = asDate(now())
-      await enforceEventRateLimit({ db, slug: input.slug, network, now: occurred })
+      await enforceEventRateLimit({ db, siteId: published.site_id, network, now: occurred, rateLimitKey })
       await beforePersist?.({ siteId: published.site_id, revision: published.revision })
       const expires = new Date(occurred.getTime() + RETENTION_DAYS * 86400000)
       const kind = eventName(input.type)

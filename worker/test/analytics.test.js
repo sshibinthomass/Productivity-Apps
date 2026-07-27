@@ -20,10 +20,15 @@ async function seedPublishedSite(db, { slug = 'maya-links' } = {}) {
     .bind(slug, JSON.stringify(data)).run()
 }
 
-function event(slug, body) {
+function event(slug, body, extraHeaders = {}) {
   return new Request(`${origin}/v1/public/sites/${slug}/events`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...extraHeaders }, body: JSON.stringify(body),
   })
+}
+
+function paddedEventBytes(bytes) {
+  const body = JSON.stringify({ type: 'view', eventId: 'byte-limit-event' })
+  return `${body}${' '.repeat(bytes - new TextEncoder().encode(body).byteLength)}`
 }
 
 describe('public mini-site analytics', () => {
@@ -84,11 +89,45 @@ describe('public mini-site analytics', () => {
     await expect(limited.json()).resolves.toMatchObject({ error: { code: 'rate_limited' } })
   })
 
+  it('accepts exactly 64 KiB and cancels a streaming body immediately beyond the byte limit', async () => {
+    const exact = await worker.fetch(new Request(`${origin}/v1/public/sites/maya-links/events`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: paddedEventBytes(65536) }), env, createExecutionContext())
+    expect(exact.status).toBe(200)
+    const chunks = [new Uint8Array(65536), new Uint8Array(1)]
+    let delivered = 0; let cancelled = false
+    const stream = new ReadableStream({
+      pull(controller) {
+        const chunk = chunks.shift()
+        if (chunk) {
+          delivered += chunk.byteLength
+          controller.enqueue(chunk)
+        }
+      },
+      cancel() { cancelled = true },
+    })
+    const oversized = await worker.fetch(new Request(`${origin}/v1/public/sites/maya-links/events`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: stream, duplex: 'half' }), env, createExecutionContext())
+    expect(oversized.status).toBe(413)
+    expect(delivered).toBe(65537)
+    expect(cancelled).toBe(true)
+  })
+
+  it('keeps the 30/31 public-event limit stable across a published slug change without storing the raw IP', async () => {
+    const headers = { 'CF-Connecting-IP': '203.0.113.45' }
+    const first = await worker.fetch(event('maya-links', { type: 'view', eventId: 'stable-key-first' }, headers), env, createExecutionContext())
+    expect(first.status).toBe(200)
+    await env.DB.prepare("UPDATE published_sites SET slug = 'maya-renamed' WHERE site_id = 'site-1'").run()
+    const responses = await Promise.all(Array.from({ length: 30 }, (_, index) => worker.fetch(event('maya-renamed', { type: 'view', eventId: `stable-key-${index}` }, headers), env, createExecutionContext())))
+    expect(responses.filter((response) => response.status === 200)).toHaveLength(29)
+    expect(responses.filter((response) => response.status === 429)).toHaveLength(1)
+    const row = await env.DB.prepare('SELECT key_hash FROM public_event_rate_limits').first()
+    expect(row.key_hash).toMatch(/^[a-f0-9]{64}$/)
+    expect(JSON.stringify(row)).not.toContain('203.0.113.45')
+  })
+
   it('gates a validated event on the same published site revision at commit time', async () => {
     let release; let validated
     const blocked = new Promise((resolve) => { release = resolve })
     const reached = new Promise((resolve) => { validated = resolve })
-    const analytics = createAnalyticsService({ db: env.DB, beforePersist: async () => { validated(); await blocked } })
+    const analytics = createAnalyticsService({ db: env.DB, rateLimitKey: 'test-rate-limit-key', beforePersist: async () => { validated(); await blocked } })
     const recording = analytics.record({ slug: 'maya-links', data: { type: 'view', eventId: 'race-event-0001' }, network: '203.0.113.1' })
     await reached
     await env.DB.prepare('DELETE FROM published_sites WHERE slug = ?').bind('maya-links').run()
@@ -110,11 +149,14 @@ describe('public mini-site analytics', () => {
       VALUES ('expired-receipt', 'site-1', 'view', '2020-01-01T00:00:00.000Z')`).run()
     await env.DB.prepare(`INSERT INTO auth_rate_limits (key_hash, window_started_at, attempt_count, expires_at)
       VALUES (?1, '2020-01-01T00:00:00.000Z', 1, '2020-01-01T00:00:00.000Z')`).bind('a'.repeat(64)).run()
+    await env.DB.prepare(`INSERT INTO public_event_rate_limits (key_hash, window_started_at, attempt_count, expires_at)
+      VALUES (?1, '2020-01-01T00:00:00.000Z', 1, '2020-01-01T00:00:00.000Z')`).bind('b'.repeat(64)).run()
 
     const context = createExecutionContext()
     await worker.scheduled({ scheduledTime: Date.now() }, env, context)
 
     await expect(env.DB.prepare('SELECT COUNT(*) AS count FROM analytics_events').first()).resolves.toEqual({ count: 0 })
     await expect(env.DB.prepare('SELECT COUNT(*) AS count FROM auth_rate_limits').first()).resolves.toEqual({ count: 0 })
+    await expect(env.DB.prepare('SELECT COUNT(*) AS count FROM public_event_rate_limits').first()).resolves.toEqual({ count: 0 })
   })
 })

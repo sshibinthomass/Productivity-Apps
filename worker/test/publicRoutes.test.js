@@ -105,6 +105,15 @@ describe('public mini-site routes', () => {
     expect(response.status).not.toBe(500)
   })
 
+  it('adds public browser hardening headers to static root and fallback assets', async () => {
+    for (const path of ['/', '/index.html', '/assets/not-a-public-r2-object.js']) {
+      const response = await worker.fetch(new Request(`${publicOrigin}${path}`), env, createExecutionContext())
+      expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff')
+      expect(response.headers.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin')
+      expect(response.headers.get('Content-Security-Policy')).toContain("default-src 'self'")
+    }
+  })
+
   it('streams published R2 assets with their authoritative MIME type and nosniff', async () => {
     await env.MEDIA.put('public/private-site-id/3/avatar', new Uint8Array([137, 80, 78, 71]), {
       httpMetadata: { contentType: 'image/png', contentDisposition: 'inline; filename="avatar"' },

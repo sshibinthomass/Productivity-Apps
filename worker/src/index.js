@@ -234,7 +234,7 @@ export function createWorker(dependencies = {}) {
       try {
         if (hostname === 'links.shibinthomas.com') {
           const assets = createAssetService({ bucket: env.MEDIA, db: env.DB, publicOrigin: env.PUBLIC_SITE_ORIGIN })
-          const analytics = createAnalyticsService({ db: env.DB })
+          const analytics = createAnalyticsService({ db: env.DB, rateLimitKey: env.BETTER_AUTH_SECRET })
           const routes = createPublicRoutes({
             db: env.DB, assets, analytics, staticAssets: env.ASSETS, origin: env.PUBLIC_SITE_ORIGIN,
           })
@@ -304,7 +304,7 @@ export function createWorker(dependencies = {}) {
     async scheduled(_event, runtimeEnv, context) {
       const env = validateEnv(runtimeEnv)
       const assets = createAssetService({ bucket: env.MEDIA, db: env.DB, publicOrigin: env.PUBLIC_SITE_ORIGIN })
-      const cleanup = createAnalyticsService({ db: env.DB }).cleanup({ assets })
+      const cleanup = createAnalyticsService({ db: env.DB, rateLimitKey: env.BETTER_AUTH_SECRET }).cleanup({ assets })
       if (context?.waitUntil) context.waitUntil(cleanup)
       else await cleanup
     },

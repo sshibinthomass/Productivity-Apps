@@ -39,12 +39,37 @@ function publicSite(snapshot, slug, revision) {
 
 function decoded(value) { try { const result = decodeURIComponent(value); if (!result || result.includes('/') || result.includes('\\')) throw new Error(); return result } catch { throw new ApiError('not_found', 'Not found.', 404) } }
 function assetPath(pathname) { const match = /^\/assets\/([^/]+)\/(\d+)\/([^/]+)$/.exec(pathname); return match ? { siteId: decoded(match[1]), revision: Number(match[2]), assetId: decoded(match[3]) } : null }
-async function parseBody(request) { if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get('Content-Type') ?? '')) throw new ApiError('unsupported_media_type', 'Use application/json for this request.', 415); const source = await request.text(); if (new TextEncoder().encode(source).byteLength > MAX_EVENT_BYTES) throw new ApiError('request_too_large', 'Event bodies must not exceed 64 KiB.', 413); try { return JSON.parse(source) } catch { throw new ApiError('invalid_argument', 'Request body must contain valid JSON.', 400) } }
+async function parseBody(request) {
+  if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get('Content-Type') ?? '')) throw new ApiError('unsupported_media_type', 'Use application/json for this request.', 415)
+  const contentLength = Number(request.headers.get('Content-Length'))
+  if (Number.isFinite(contentLength) && contentLength > MAX_EVENT_BYTES) throw new ApiError('request_too_large', 'Event bodies must not exceed 64 KiB.', 413)
+  if (!request.body) throw new ApiError('invalid_argument', 'Request body must contain valid JSON.', 400)
+  const reader = request.body.getReader(); const chunks = []; let size = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (size + value.byteLength > MAX_EVENT_BYTES) {
+        await reader.cancel('event body too large')
+        throw new ApiError('request_too_large', 'Event bodies must not exceed 64 KiB.', 413)
+      }
+      chunks.push(value); size += value.byteLength
+    }
+  } finally { reader.releaseLock() }
+  const bytes = new Uint8Array(size); let offset = 0
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength }
+  try { return JSON.parse(new TextDecoder().decode(bytes)) } catch { throw new ApiError('invalid_argument', 'Request body must contain valid JSON.', 400) }
+}
 function network(request) { return request.headers.get('CF-Connecting-IP') ?? request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ?? 'unknown' }
 
 export function createPublicRoutes({ db, assets, staticAssets, analytics, origin }) {
   async function findSite(slug) { const row = await db.prepare('SELECT slug, snapshot_json, revision FROM published_sites WHERE slug = ?1 LIMIT 1').bind(slug).first(); return row ? publicSite(JSON.parse(row.snapshot_json), row.slug, row.revision) : null }
-  async function staticFallback(request) { return staticAssets?.fetch ? staticAssets.fetch(request) : notFound() }
+  async function staticFallback(request) {
+    const response = staticAssets?.fetch ? await staticAssets.fetch(request) : notFound()
+    const result = new Headers(response.headers)
+    for (const [key, value] of Object.entries(headers(result.get('Cache-Control') ?? 'no-store'))) result.set(key, value)
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers: result })
+  }
   function safeError(error) { const response = errorResponse(error); for (const [key, value] of Object.entries(headers('no-store'))) response.headers.set(key, value); return response }
   return { async handle(request) {
     try {
