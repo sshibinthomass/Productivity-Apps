@@ -50,7 +50,7 @@ describe('App authentication routes', () => {
     renderAt('/login')
 
     expect(
-      screen.getByRole('button', { name: 'Continue with Google' }),
+      screen.getByLabelText('Email address'),
     ).toBeTruthy()
   })
 
@@ -59,7 +59,7 @@ describe('App authentication routes', () => {
 
     expect(screen.getByLabelText('Your links')).toBeTruthy()
     expect(
-      screen.queryByRole('button', { name: 'Continue with Google' }),
+      screen.queryByLabelText('Email address'),
     ).toBeNull()
   })
 
@@ -69,7 +69,7 @@ describe('App authentication routes', () => {
     expect(screen.getByLabelText('Input JSON')).toBeTruthy()
     expect(screen.getByLabelText('Formatted JSON')).toBeTruthy()
     expect(
-      screen.queryByRole('button', { name: 'Continue with Google' }),
+      screen.queryByLabelText('Email address'),
     ).toBeNull()
   })
 
@@ -79,7 +79,7 @@ describe('App authentication routes', () => {
     expect(screen.getByLabelText('Text 1 / Original')).toBeTruthy()
     expect(screen.getByLabelText('Text 2 / Revised')).toBeTruthy()
     expect(
-      screen.queryByRole('button', { name: 'Continue with Google' }),
+      screen.queryByLabelText('Email address'),
     ).toBeNull()
   })
 
@@ -88,7 +88,7 @@ describe('App authentication routes', () => {
 
     expect(screen.getByLabelText('Website URL')).toBeTruthy()
     expect(
-      screen.queryByRole('button', { name: 'Continue with Google' }),
+      screen.queryByLabelText('Email address'),
     ).toBeNull()
   })
 
@@ -107,7 +107,7 @@ describe('App authentication routes', () => {
     renderAt('/private-fixture', protectedRegistry)
 
     expect(
-      screen.getByRole('button', { name: 'Continue with Google' }),
+      screen.getByLabelText('Email address'),
     ).toBeTruthy()
     expect(screen.queryByText('Private fixture app')).toBeNull()
   })
@@ -116,7 +116,7 @@ describe('App authentication routes', () => {
     renderAt('/mini-sites/site-1/analytics')
 
     expect(
-      screen.getByRole('button', { name: 'Continue with Google' }),
+      screen.getByLabelText('Email address'),
     ).toBeTruthy()
   })
 

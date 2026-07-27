@@ -1060,6 +1060,178 @@ p {
   padding-top: var(--space-4);
 }
 
+.auth-card {
+  max-width: 42rem;
+}
+
+.auth-card__identity {
+  align-items: center;
+  border-bottom: 1px solid var(--color-border-light);
+  color: var(--theme-accent-text);
+  display: flex;
+  font-family: var(--font-utility);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.11em;
+  margin-top: var(--space-4);
+  min-height: 2.8rem;
+  text-transform: uppercase;
+}
+
+.auth-mode-switch {
+  border-bottom: 1px solid var(--color-border-light);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-block: var(--space-6) var(--space-5);
+}
+
+.auth-mode-switch button,
+.auth-inline-button {
+  background: transparent;
+  border: 0;
+  color: var(--color-context-slate);
+  cursor: pointer;
+  font: inherit;
+}
+
+.auth-mode-switch button {
+  border-bottom: 2px solid transparent;
+  font-family: var(--font-utility);
+  font-size: 0.72rem;
+  letter-spacing: 0.07em;
+  min-height: 44px;
+  text-transform: uppercase;
+}
+
+.auth-mode-switch button:hover,
+.auth-mode-switch__active,
+.auth-inline-button:hover {
+  color: var(--color-spatial-ink);
+}
+
+.auth-mode-switch__active {
+  border-bottom-color: var(--color-signal-mint) !important;
+  font-weight: 500;
+}
+
+.auth-form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.auth-form label:not(.auth-consent) {
+  color: var(--color-spatial-ink);
+  font-size: var(--text-small);
+  font-weight: 650;
+  margin-top: var(--space-2);
+}
+
+.auth-form input:not([type="checkbox"]) {
+  background: var(--color-interface-white);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-control);
+  color: var(--color-spatial-ink);
+  min-height: 48px;
+  padding: 0.65rem 0.8rem;
+}
+
+.auth-form input:not([type="checkbox"]):focus {
+  border-color: var(--theme-accent-text);
+  outline: 0;
+}
+
+.auth-form__help {
+  color: var(--color-context-slate);
+  font-size: var(--text-small);
+  margin: calc(var(--space-3) * -1) 0 0;
+}
+
+.auth-consent {
+  align-items: flex-start;
+  color: var(--color-context-slate);
+  display: flex;
+  font-size: var(--text-small);
+  gap: var(--space-2);
+  line-height: 1.45;
+  margin-top: var(--space-2);
+}
+
+.auth-consent input {
+  accent-color: var(--theme-accent-text);
+  flex: 0 0 auto;
+  height: 1.15rem;
+  margin-top: 0.1rem;
+  width: 1.15rem;
+}
+
+.auth-consent a,
+.login-card__public-note a,
+.auth-inline-button,
+.legal-page a {
+  color: var(--theme-accent-text);
+  font-weight: 650;
+}
+
+.auth-inline-button {
+  padding: 0;
+  text-decoration: underline;
+}
+
+.turnstile-widget {
+  min-height: 65px;
+}
+
+.auth-form__notice {
+  background: var(--color-mint-wash);
+  border-left: 3px solid var(--color-signal-mint);
+  color: var(--color-spatial-ink);
+  font-size: var(--text-small);
+  margin: var(--space-4) 0 0;
+  padding: var(--space-3);
+}
+
+.account-security,
+.legal-page {
+  margin: 0 auto;
+  max-width: var(--content-reading);
+  min-height: calc(100vh - 12rem);
+  padding-block: var(--space-8);
+}
+
+.account-security h1,
+.legal-page h1 {
+  font-size: var(--text-heading-1);
+  margin-top: var(--space-4);
+}
+
+.account-security > p:not(.eyebrow),
+.legal-page > p {
+  color: var(--theme-text-secondary);
+}
+
+.account-security__form {
+  background: var(--theme-form-surface);
+  border: 1px solid var(--theme-border);
+  border-radius: var(--radius-card);
+  color: var(--color-spatial-ink);
+  margin-top: var(--space-6);
+  padding: var(--space-5);
+}
+
+.legal-page h2 {
+  font-size: var(--text-heading-3);
+  margin-top: var(--space-7);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 @media (min-width: 768px) {
   .site-shell {
     padding-inline: 32px;
@@ -1215,6 +1387,23 @@ p {
 
   .login-card {
     border-radius: var(--radius-card);
+  }
+
+  .auth-card {
+    padding: var(--space-5);
+  }
+
+  .auth-mode-switch {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-mode-switch button {
+    text-align: left;
+  }
+
+  .account-security,
+  .legal-page {
+    padding-block: var(--space-6);
   }
 }
 
